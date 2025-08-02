@@ -1,9 +1,21 @@
-import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
+let tailwindcssPlugin;
+try {
+	const tailwindcss = await import('@tailwindcss/vite');
+	tailwindcssPlugin = tailwindcss.default();
+	console.log('✓ @tailwindcss/vite loaded successfully');
+} catch (error) {
+	console.warn('⚠ Failed to load @tailwindcss/vite, falling back to PostCSS:', error instanceof Error ? error.message : String(error));
+	tailwindcssPlugin = null;
+}
+
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit()],
+	plugins: [tailwindcssPlugin, sveltekit()].filter(Boolean),
+	css: {
+		postcss: tailwindcssPlugin ? undefined : './postcss.config.js'
+	},
 	build: {
 		rollupOptions: {
 			external: [],
@@ -15,6 +27,10 @@ export default defineConfig({
 		minify: 'esbuild'
 	},
 	optimizeDeps: {
-		include: ['@stripe/stripe-js', 'pocketbase', 'stripe']
+		include: ['@stripe/stripe-js', 'pocketbase', 'stripe'],
+		exclude: ['lightningcss']
+	},
+	ssr: {
+		noExternal: ['lightningcss']
 	}
 });
