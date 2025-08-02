@@ -10,6 +10,7 @@
   ADBLOCK = "true"
   NPM_CONFIG_FUND = "false"
   NPM_CONFIG_AUDIT = "false"
+  NPM_CONFIG_OPTIONAL = "true"
 
 [[headers]]
   for = "/*"
