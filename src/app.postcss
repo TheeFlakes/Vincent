@@ -1,0 +1,22 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Custom styles can be added here */
+body {
+    @apply font-sans antialiased;
+}
+
+/* Loading spinner utility */
+.spinner {
+    @apply animate-spin rounded-full border-4 border-gray-200 border-t-indigo-600;
+}
+
+/* Form validation styles */
+.form-error {
+    @apply text-red-600 text-sm mt-1;
+}
+
+.form-success {
+    @apply text-green-600 text-sm mt-1;
+}
