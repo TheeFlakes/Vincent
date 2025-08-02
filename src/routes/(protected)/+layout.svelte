@@ -86,6 +86,10 @@
         <div 
             class="fixed inset-0 z-40 lg:hidden"
             onclick={closeSidebar}
+            role="button"
+            tabindex="0"
+            onkeydown={(e) => e.key === 'Escape' && closeSidebar()}
+            aria-label="Close sidebar overlay"
         >
             <div class="absolute inset-0 bg-black/50"></div>
         </div>
@@ -105,6 +109,7 @@
                 <button 
                     class="lg:hidden p-2 rounded-md text-[#A0A0A0] hover:text-[#F0F0F0] hover:bg-[#3B3B3B]"
                     onclick={closeSidebar}
+                    aria-label="Close sidebar"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -178,6 +183,7 @@
                 <button
                     onclick={toggleSidebar}
                     class="p-2 rounded-md text-[#A0A0A0] hover:text-[#F0F0F0] hover:bg-[#3B3B3B]"
+                    aria-label="Open sidebar menu"
                 >
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>

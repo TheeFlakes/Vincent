@@ -37,6 +37,7 @@ export async function handle({ event, resolve }) {
     // Define protected routes
     const protectedRoutes = ['/dashboard'];
     const authRoutes = ['/login', '/signup'];
+    const adminRoutes = ['/admin'];
     
     const isProtectedRoute = protectedRoutes.some(route => 
         event.url.pathname.startsWith(route)
@@ -46,8 +47,13 @@ export async function handle({ event, resolve }) {
         event.url.pathname.startsWith(route)
     );
 
+    const isAdminRoute = adminRoutes.some(route => 
+        event.url.pathname.startsWith(route)
+    );
+
     // Check if user is authenticated
     const isAuthenticated = pb.authStore.isValid;
+    const isAdmin = pb.authStore.model && (pb.authStore.model.role === 'admin' || pb.authStore.model.role === 'super_admin');
 
     // Redirect logic - but only if PocketBase is available
     try {
@@ -57,8 +63,26 @@ export async function handle({ event, resolve }) {
         }
 
         if (isAuthRoute && isAuthenticated) {
-            // Redirect to dashboard if already authenticated and trying to access auth pages
-            throw redirect(303, '/dashboard');
+            // If admin, redirect to admin dashboard, otherwise regular dashboard
+            if (isAdmin) {
+                throw redirect(303, '/admin');
+            } else {
+                throw redirect(303, '/dashboard');
+            }
+        }
+
+        if (isAdminRoute && !isAdmin) {
+            // Redirect non-admin users away from admin routes
+            if (isAuthenticated) {
+                throw redirect(303, '/dashboard');
+            } else {
+                throw redirect(303, '/login');
+            }
+        }
+
+        // If regular user tries to access /dashboard but is admin, redirect to admin
+        if (event.url.pathname === '/dashboard' && isAdmin) {
+            throw redirect(303, '/admin');
         }
     } catch (error) {
         // If it's a redirect, re-throw it
