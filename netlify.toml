@@ -1,0 +1,30 @@
+[build]
+  publish = "build"
+  command = "npm run netlify-build"
+
+[build.environment]
+  NODE_VERSION = "18.20.4"
+  NPM_VERSION = "10.8.2"
+  NODE_OPTIONS = "--max-old-space-size=4096"
+  DISABLE_OPENCOLLECTIVE = "true"
+  ADBLOCK = "true"
+  NPM_CONFIG_FUND = "false"
+  NPM_CONFIG_AUDIT = "false"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

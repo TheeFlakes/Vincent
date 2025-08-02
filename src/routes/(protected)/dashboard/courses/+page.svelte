@@ -110,10 +110,29 @@
         return 'bg-[#C392EC]/10 text-[#C392EC] border-[#C392EC]/20';
     }
     
-    // Navigate to course detail (placeholder)
-    function viewCourse(courseId) {
-        // Navigate to course detail page
-        goto(`/dashboard/courses/${courseId}`);
+    // Navigate to course detail with faster transition
+    async function viewCourse(courseId) {
+        console.log('Navigating to course:', courseId);
+        
+        // Add visual feedback immediately
+        loading = true;
+        
+        try {
+            // Use faster navigation
+            await goto(`/dashboard/courses/${courseId}`, { 
+                noScroll: false,
+                replaceState: false,
+                keepFocus: false,
+                invalidateAll: false
+            });
+            console.log('Navigation successful');
+        } catch (error) {
+            console.error('Navigation error:', error);
+            // Fallback navigation
+            window.location.href = `/dashboard/courses/${courseId}`;
+        } finally {
+            loading = false;
+        }
     }
     
     // Truncate text
@@ -286,7 +305,7 @@
             <!-- Courses Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {#each courses as course (course.id)}
-                    <div class="bg-[#2B2B2B] rounded-xl overflow-hidden shadow-lg border border-[#2B2B2B] hover:border-[#C392EC]/30 transition-all duration-300 group cursor-pointer"
+                    <div class="bg-[#2B2B2B] rounded-xl overflow-hidden shadow-lg border border-[#2B2B2B] hover:border-[#C392EC]/30 transition-all duration-200 group cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
                          onclick={() => viewCourse(course.id)}>
                         <!-- Course thumbnail -->
                         <div class="relative h-48 bg-gradient-to-br from-[#C392EC]/20 to-[#85D5C8]/20 flex items-center justify-center overflow-hidden">
@@ -294,7 +313,8 @@
                                 <img 
                                     src={pb.files.getUrl(course, course.thumbnail)}
                                     alt={course.title}
-                                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                    loading="lazy"
                                 />
                             {:else}
                                 <svg class="w-16 h-16 text-[#C392EC]/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -363,7 +383,7 @@
                             
                             <!-- View course button -->
                             <div class="mt-4 pt-4 border-t border-[#3B3B3B]">
-                                <button class="w-full px-4 py-2 bg-[#C392EC]/10 text-[#C392EC] rounded-lg font-medium text-sm hover:bg-[#C392EC] hover:text-white transition-all duration-200 group-hover:bg-[#C392EC] group-hover:text-white">
+                                <button class="w-full px-4 py-2 bg-[#C392EC]/10 text-[#C392EC] rounded-lg font-medium text-sm hover:bg-[#C392EC] hover:text-white transition-all duration-150 group-hover:bg-[#C392EC] group-hover:text-white">
                                     View Course Details
                                 </button>
                             </div>

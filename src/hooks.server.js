@@ -49,15 +49,24 @@ export async function handle({ event, resolve }) {
     // Check if user is authenticated
     const isAuthenticated = pb.authStore.isValid;
 
-    // Redirect logic
-    if (isProtectedRoute && !isAuthenticated) {
-        // Redirect to login if trying to access protected route without auth
-        throw redirect(303, '/login');
-    }
+    // Redirect logic - but only if PocketBase is available
+    try {
+        if (isProtectedRoute && !isAuthenticated) {
+            // Redirect to login if trying to access protected route without auth
+            throw redirect(303, '/login');
+        }
 
-    if (isAuthRoute && isAuthenticated) {
-        // Redirect to dashboard if already authenticated and trying to access auth pages
-        throw redirect(303, '/dashboard');
+        if (isAuthRoute && isAuthenticated) {
+            // Redirect to dashboard if already authenticated and trying to access auth pages
+            throw redirect(303, '/dashboard');
+        }
+    } catch (error) {
+        // If it's a redirect, re-throw it
+        if (error && typeof error === 'object' && 'status' in error && error.status === 303) {
+            throw error;
+        }
+        // Otherwise, log the error but continue
+        console.error('Error in auth redirect logic:', error);
     }
 
     // Store auth data in locals for use in load functions

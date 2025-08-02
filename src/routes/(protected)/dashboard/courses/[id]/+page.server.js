@@ -3,36 +3,49 @@ import { error } from '@sveltejs/kit';
 
 export async function load({ params, locals }) {
     try {
-        // Fetch the specific course
-        const course = await pb.collection('courses').getOne(params.id, {
-            requestKey: null // Disable auto-cancellation for server-side requests
-        });
+        // Check if we have a user
+        if (!locals.user) {
+            throw error(401, 'Authentication required');
+        }
 
-        // Fetch course lessons
-        const lessonsResult = await pb.collection('course_lessons').getList(1, 50, {
-            filter: `module = "${params.id}"`,
-            sort: 'order',
-            requestKey: null
-        });
+        console.log('Loading course with ID:', params.id);
 
-        // Check if user is enrolled (has progress record)
+        // Add timeout and better error handling for PocketBase requests
+        const timeout = (ms) => new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timeout')), ms)
+        );
+
+        // Use Promise.all for parallel loading with timeout protection
+        const [course, lessonsResult, userProgressResult] = await Promise.race([
+            Promise.all([
+                // Fetch the specific course
+                pb.collection('courses').getOne(params.id, {
+                    requestKey: null // Disable auto-cancellation for server-side requests
+                }),
+                
+                // Fetch course lessons
+                pb.collection('course_lessons').getList(1, 50, {
+                    filter: `module = "${params.id}"`,
+                    sort: 'order',
+                    requestKey: null
+                }),
+                
+                // Check if user is enrolled (has progress record)
+                pb.collection('user_progress').getList(1, 1, {
+                    filter: `user = "${locals.user.id}" && course = "${params.id}"`,
+                    requestKey: null
+                }).catch(() => ({ items: [] }))
+            ]),
+            timeout(10000) // 10 second timeout
+        ]);
+
+        // Process enrollment status
         let userProgress = null;
         let isEnrolled = false;
         
-        if (locals.user) {
-            try {
-                const progressResult = await pb.collection('user_progress').getList(1, 1, {
-                    filter: `user = "${locals.user.id}" && course = "${params.id}"`,
-                    requestKey: null
-                });
-                
-                if (progressResult.items.length > 0) {
-                    userProgress = progressResult.items[0];
-                    isEnrolled = true;
-                }
-            } catch (err) {
-                console.log('No enrollment found');
-            }
+        if (userProgressResult.items.length > 0) {
+            userProgress = userProgressResult.items[0];
+            isEnrolled = true;
         }
 
         return {
@@ -45,6 +58,24 @@ export async function load({ params, locals }) {
         };
     } catch (err) {
         console.error('Error loading course:', err);
-        throw error(404, 'Course not found');
+        
+        // Handle specific error types
+        if (err instanceof Error && err.message === 'Request timeout') {
+            throw error(503, 'Database service is temporarily unavailable. Please try again later.');
+        }
+        
+        if (err && typeof err === 'object' && 'status' in err && err.status === 404) {
+            throw error(404, 'Course not found');
+        }
+        
+        if (err && typeof err === 'object' && 
+            (('status' in err && err.status === 0) || 
+             ('message' in err && typeof err.message === 'string' && 
+              (err.message.includes('fetch failed') || err.message.includes('Connect Timeout'))))) {
+            throw error(503, 'Unable to connect to the database. Please check your internet connection and try again.');
+        }
+        
+        // Generic server error
+        throw error(500, 'An error occurred while loading the course. Please try again later.');
     }
 }

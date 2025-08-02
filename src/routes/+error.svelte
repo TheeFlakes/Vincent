@@ -17,13 +17,32 @@
                     Access Denied
                 {:else if $page.status === 401}
                     Unauthorized
+                {:else if $page.status === 503}
+                    Service Unavailable
                 {:else}
                     Something went wrong
                 {/if}
             </h2>
             <p class="mt-2 text-[#A0A0A0]">
-                {$page.error?.message || 'An unexpected error occurred'}
+                {#if $page.status === 503}
+                    {$page.error?.message || 'The service is temporarily unavailable. Please try again in a few minutes.'}
+                {:else}
+                    {$page.error?.message || 'An unexpected error occurred'}
+                {/if}
             </p>
+            
+            <!-- Additional help for specific errors -->
+            {#if $page.status === 503}
+                <div class="mt-4 p-4 bg-yellow-900/20 border border-yellow-600/30 rounded-lg text-left">
+                    <h3 class="text-yellow-400 font-semibold mb-2">What you can try:</h3>
+                    <ul class="text-sm text-[#A0A0A0] space-y-1">
+                        <li>• Check your internet connection</li>
+                        <li>• Wait a few minutes and try again</li>
+                        <li>• Clear your browser cache and cookies</li>
+                        <li>• Try accessing the site from a different browser</li>
+                    </ul>
+                </div>
+            {/if}
         </div>
         
         <div class="flex flex-col space-y-4">
@@ -42,6 +61,13 @@
             >
                 Go Home
             </a>
+            
+            <button
+                onclick={() => window.location.reload()}
+                class="w-full flex justify-center py-2 px-4 border border-[#2B2B2B] rounded-md shadow-sm text-sm font-medium text-[#F0F0F0] bg-[#2B2B2B] hover:bg-[#3A3A3A] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#85D5C8]"
+            >
+                Try Again
+            </button>
             
             <button
                 onclick={() => history.back()}

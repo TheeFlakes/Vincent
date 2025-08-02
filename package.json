@@ -3,13 +3,19 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+	"engines": {
+		"node": ">=18.0.0",
+		"npm": ">=9.0.0"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"prepare": "svelte-kit sync || echo ''",
+		"prepare": "svelte-kit sync || echo 'svelte-kit sync failed, continuing...'",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
+		"postinstall": "npm run prepare",
+		"netlify-build": "npm ci --prefer-offline --no-audit --legacy-peer-deps && npm run build"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^6.0.0",
@@ -26,5 +32,12 @@
 		"@stripe/stripe-js": "^7.8.0",
 		"pocketbase": "^0.26.2",
 		"stripe": "^18.4.0"
+	},
+	"optionalDependencies": {
+		"@rollup/rollup-linux-x64-gnu": "^4.24.0",
+		"@rollup/rollup-linux-arm64-gnu": "^4.24.0",
+		"@rollup/rollup-darwin-x64": "^4.24.0",
+		"@rollup/rollup-darwin-arm64": "^4.24.0",
+		"@rollup/rollup-win32-x64-msvc": "^4.24.0"
 	}
 }

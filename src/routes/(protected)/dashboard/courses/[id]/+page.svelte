@@ -15,6 +15,19 @@
     let isEnrolling = $state(false);
     let showEnrollmentSuccess = $state(false);
     let showPaymentSuccess = $state(false);
+    let pageLoading = $state(false);
+    
+    // Update reactive state when data prop changes
+    $effect(() => {
+        console.log('Course data received:', data);
+        if (data) {
+            course = data.course;
+            lessons = data.lessons || [];
+            totalLessons = data.totalLessons || 0;
+            userProgress = data.userProgress;
+            isEnrolled = data.isEnrolled || false;
+        }
+    });
     
     // Check for enrollment success from URL params
     $effect(() => {
@@ -100,11 +113,6 @@
         goto(`/dashboard/courses/${course.id}/checkout`);
     }
     
-    // Go back to courses
-    function goBack() {
-        goto('/dashboard/courses');
-    }
-    
     // Format duration
     function formatDuration(minutes) {
         if (minutes < 60) {
@@ -137,13 +145,41 @@
     function getTotalDuration() {
         return lessons.reduce((total, lesson) => total + (lesson.duration || 0), 0);
     }
+    
+    // Go back to courses
+    function goBack() {
+        goto('/dashboard/courses');
+    }
 </script>
 
 <svelte:head>
-    <title>{course.title} - Cashfluenced</title>
+    <title>{course?.title || 'Course'} - Cashfluenced</title>
 </svelte:head>
 
 <main class="bg-[#1A1A1A] min-h-full">
+    {#if !course}
+        <!-- Loading State -->
+        <div class="px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 sm:py-8 md:py-12 lg:py-16">
+            <div class="animate-pulse">
+                <div class="bg-[#2B2B2B] h-8 w-32 rounded mb-6"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2">
+                        <div class="bg-[#2B2B2B] rounded-xl p-6 mb-6">
+                            <div class="h-6 bg-[#3B3B3B] rounded mb-4"></div>
+                            <div class="h-4 bg-[#3B3B3B] rounded w-3/4 mb-2"></div>
+                            <div class="h-4 bg-[#3B3B3B] rounded w-1/2"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="bg-[#2B2B2B] rounded-xl p-6">
+                            <div class="h-6 bg-[#3B3B3B] rounded mb-4"></div>
+                            <div class="h-10 bg-[#3B3B3B] rounded"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {:else}
     <div class="px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 sm:py-8 md:py-12 lg:py-16">
         <!-- Back button -->
         <button 
@@ -370,8 +406,9 @@
             </div>
         </div>
     </div>
-    
-    <!-- Enrollment Success Notification -->
+    {/if}
+
+    <!-- Enrollment Success Modal -->
     {#if showEnrollmentSuccess}
         <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div class="bg-[#2B2B2B] rounded-xl p-8 border border-[#85D5C8]/30 text-center max-w-md mx-4">
