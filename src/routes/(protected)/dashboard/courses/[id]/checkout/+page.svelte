@@ -1,6 +1,8 @@
 <script>
     import { currentUser, pb } from '$lib/pocketbase.js';
     import { goto } from '$app/navigation';
+    import { page } from '$app/stores';
+    import { createCheckoutSession } from '$lib/stripe-client.js';
     
     let { data } = $props();
     
@@ -9,8 +11,23 @@
     let isEnrolled = $state(data.isEnrolled);
     
     let isProcessing = $state(false);
-    let paymentMethod = $state('card');
+    let paymentMethod = $state('stripe');
     let selectedPlan = $state('full');
+    let errorMessage = $state('');
+    let showCancelMessage = $state(false);
+    
+    // Check for cancel parameter
+    $effect(() => {
+        if ($page.url.searchParams.get('canceled') === 'true') {
+            showCancelMessage = true;
+            errorMessage = 'Payment was canceled. You can try again when you\'re ready.';
+            
+            // Clear the parameter
+            const url = new URL($page.url);
+            url.searchParams.delete('canceled');
+            goto(url.toString(), { replaceState: true });
+        }
+    });
     
     // Payment plans
     const paymentPlans = [
@@ -20,7 +37,7 @@
             price: course.price,
             description: 'One-time payment for lifetime access',
             badge: 'Best Value',
-            savings: null
+            mode: 'payment'
         },
         {
             id: 'installment',
@@ -28,7 +45,7 @@
             price: Math.ceil(course.price / 3),
             description: '3 monthly payments',
             badge: null,
-            savings: null
+            mode: 'subscription'
         }
     ];
     
@@ -46,31 +63,25 @@
         return `$${price}`;
     }
     
-    // Handle payment processing
+    // Handle Stripe payment processing
     async function processPayment() {
         if (isProcessing) return;
         
         isProcessing = true;
+        errorMessage = '';
+        
         try {
-            // Simulate payment processing
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            const selectedPlanData = paymentPlans.find(p => p.id === selectedPlan);
             
-            // Create enrollment record
-            await pb.collection('user_progress').create({
-                user: user.id,
-                course: course.id,
-                completed_lessons: [],
-                current_lesson: null,
-                completion_percentage: 0,
-                last_accessed: new Date().toISOString()
-            });
-            
-            // Redirect to course with success message
-            goto(`/dashboard/courses/${course.id}?enrolled=true`);
+            await createCheckoutSession(
+                course.id,
+                selectedPlanData.mode,
+                null // We'll use dynamic pricing for now
+            );
             
         } catch (err) {
             console.error('Payment failed:', err);
-            alert('Payment failed. Please try again.');
+            errorMessage = err.message || 'Payment failed. Please try again.';
         } finally {
             isProcessing = false;
         }
@@ -188,115 +199,44 @@
                                 <input 
                                     type="radio" 
                                     bind:group={paymentMethod} 
-                                    value="card"
+                                    value="stripe"
                                     class="sr-only"
                                 >
                                 <div class="p-4 rounded-lg border transition-all cursor-pointer {
-                                    paymentMethod === 'card' 
+                                    paymentMethod === 'stripe' 
                                         ? 'border-[#C392EC] bg-[#C392EC]/5' 
                                         : 'border-[#3B3B3B] hover:border-[#C392EC]/50'
                                 }">
                                     <div class="flex items-center gap-3">
                                         <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center {
-                                            paymentMethod === 'card' 
+                                            paymentMethod === 'stripe' 
                                                 ? 'border-[#C392EC] bg-[#C392EC]' 
                                                 : 'border-[#3B3B3B]'
                                         }">
-                                            {#if paymentMethod === 'card'}
+                                            {#if paymentMethod === 'stripe'}
                                                 <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                                                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
                                                 </svg>
                                             {/if}
                                         </div>
                                         <div class="flex items-center gap-3">
-                                            <svg class="w-6 h-6 text-[#F0F0F0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                                            <svg class="w-6 h-6 text-[#635BFF]" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/>
                                             </svg>
-                                            <span class="font-medium text-[#F0F0F0]">Credit/Debit Card</span>
+                                            <span class="font-medium text-[#F0F0F0]">Secure Card Payment</span>
+                                        </div>
+                                        <div class="ml-auto text-xs text-[#A0A0A0]">
+                                            Powered by Stripe
                                         </div>
                                     </div>
-                                </div>
-                            </label>
-
-                            <label class="block">
-                                <input 
-                                    type="radio" 
-                                    bind:group={paymentMethod} 
-                                    value="paypal"
-                                    class="sr-only"
-                                >
-                                <div class="p-4 rounded-lg border transition-all cursor-pointer {
-                                    paymentMethod === 'paypal' 
-                                        ? 'border-[#C392EC] bg-[#C392EC]/5' 
-                                        : 'border-[#3B3B3B] hover:border-[#C392EC]/50'
-                                }">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center {
-                                            paymentMethod === 'paypal' 
-                                                ? 'border-[#C392EC] bg-[#C392EC]' 
-                                                : 'border-[#3B3B3B]'
-                                        }">
-                                            {#if paymentMethod === 'paypal'}
-                                                <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                                                </svg>
-                                            {/if}
-                                        </div>
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-6 h-6 bg-[#0070ba] rounded flex items-center justify-center">
-                                                <span class="text-white text-xs font-bold">P</span>
-                                            </div>
-                                            <span class="font-medium text-[#F0F0F0]">PayPal</span>
-                                        </div>
+                                    <div class="mt-3 text-sm text-[#A0A0A0]">
+                                        Supports all major credit cards, Apple Pay, Google Pay, and more
                                     </div>
                                 </div>
                             </label>
                         </div>
+                        
                     </div>
-
-                    <!-- Card Details (only show if card is selected) -->
-                    {#if paymentMethod === 'card'}
-                        <div class="bg-[#2B2B2B] rounded-xl p-6 mb-6 border border-[#2B2B2B]">
-                            <h2 class="text-xl font-bold text-[#F0F0F0] mb-4">Card Details</h2>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-[#F0F0F0] mb-2">Card Number</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="1234 5678 9012 3456"
-                                        class="w-full px-4 py-3 bg-[#1A1A1A] border border-[#3B3B3B] rounded-lg text-[#F0F0F0] placeholder-[#A0A0A0] focus:outline-none focus:border-[#C392EC] focus:ring-1 focus:ring-[#C392EC]"
-                                    >
-                                </div>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-[#F0F0F0] mb-2">Expiry Date</label>
-                                        <input 
-                                            type="text" 
-                                            placeholder="MM/YY"
-                                            class="w-full px-4 py-3 bg-[#1A1A1A] border border-[#3B3B3B] rounded-lg text-[#F0F0F0] placeholder-[#A0A0A0] focus:outline-none focus:border-[#C392EC] focus:ring-1 focus:ring-[#C392EC]"
-                                        >
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-[#F0F0F0] mb-2">CVV</label>
-                                        <input 
-                                            type="text" 
-                                            placeholder="123"
-                                            class="w-full px-4 py-3 bg-[#1A1A1A] border border-[#3B3B3B] rounded-lg text-[#F0F0F0] placeholder-[#A0A0A0] focus:outline-none focus:border-[#C392EC] focus:ring-1 focus:ring-[#C392EC]"
-                                        >
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-[#F0F0F0] mb-2">Cardholder Name</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="John Doe"
-                                        class="w-full px-4 py-3 bg-[#1A1A1A] border border-[#3B3B3B] rounded-lg text-[#F0F0F0] placeholder-[#A0A0A0] focus:outline-none focus:border-[#C392EC] focus:ring-1 focus:ring-[#C392EC]"
-                                    >
-                                </div>
-                            </div>
-                        </div>
-                    {/if}
-                </div>
 
                 <!-- Order Summary -->
                 <div class="lg:col-span-1">
@@ -401,12 +341,12 @@
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
-                                Processing Payment...
+                                Redirecting to Payment...
                             {:else}
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 0h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                                 </svg>
-                                Complete Purchase
+                                Continue to Payment
                             {/if}
                         </button>
 

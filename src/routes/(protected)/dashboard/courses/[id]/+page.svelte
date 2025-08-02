@@ -14,14 +14,25 @@
     
     let isEnrolling = $state(false);
     let showEnrollmentSuccess = $state(false);
+    let showPaymentSuccess = $state(false);
     
     // Check for enrollment success from URL params
     $effect(() => {
-        if ($page.url.searchParams.get('enrolled') === 'true') {
+        const enrolled = $page.url.searchParams.get('enrolled');
+        const sessionId = $page.url.searchParams.get('session_id');
+        
+        if (enrolled === 'true') {
             showEnrollmentSuccess = true;
-            // Clear the parameter
+            
+            // If there's also a session_id, it means payment was successful
+            if (sessionId) {
+                showPaymentSuccess = true;
+            }
+            
+            // Clear the parameters
             const url = new URL($page.url);
             url.searchParams.delete('enrolled');
+            url.searchParams.delete('session_id');
             goto(url.toString(), { replaceState: true });
         }
     });
@@ -369,17 +380,25 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                     </svg>
                 </div>
-                <h3 class="text-xl font-bold text-[#F0F0F0] mb-2">Welcome to the Course!</h3>
-                <p class="text-[#A0A0A0] mb-6">You've successfully enrolled in {course.title}. Ready to start learning?</p>
+                <h3 class="text-xl font-bold text-[#F0F0F0] mb-2">
+                    {showPaymentSuccess ? 'Payment Successful!' : 'Welcome to the Course!'}
+                </h3>
+                <p class="text-[#A0A0A0] mb-6">
+                    {#if showPaymentSuccess}
+                        Your payment has been processed and you now have full access to {course.title}. Ready to start learning?
+                    {:else}
+                        You've successfully enrolled in {course.title}. Ready to start learning?
+                    {/if}
+                </p>
                 <div class="flex gap-3">
                     <button
-                        onclick={() => showEnrollmentSuccess = false}
+                        onclick={() => { showEnrollmentSuccess = false; showPaymentSuccess = false; }}
                         class="flex-1 px-4 py-2 bg-[#2B2B2B] text-[#F0F0F0] rounded-lg hover:bg-[#3B3B3B] transition-colors border border-[#3B3B3B]"
                     >
                         Later
                     </button>
                     <button
-                        onclick={() => { showEnrollmentSuccess = false; startCourse(); }}
+                        onclick={() => { showEnrollmentSuccess = false; showPaymentSuccess = false; startCourse(); }}
                         class="flex-1 px-4 py-2 bg-[#C392EC] text-white rounded-lg hover:bg-[#C392EC]/80 transition-colors"
                     >
                         Start Learning
