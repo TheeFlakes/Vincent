@@ -142,7 +142,7 @@
 		<!-- Mobile menu -->
 		{#if mobileMenuOpen && !user}
 			<div class="lg:hidden bg-[#2B2B2B] border-t border-[#3A3A3A] shadow-xl relative z-50">
-				<div class="px-4 py-6 space-y-4">
+				<div class="mobile-menu-content px-4 py-6 space-y-4 max-h-[80vh] overflow-y-auto">
 					<!-- Mobile Navigation Links -->
 					<div class="space-y-2">
 						{#each navLinks as link}

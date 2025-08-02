@@ -32,14 +32,14 @@ export async function login(email, password) {
             }
             
             if (error.status === 0) {
-                return { success: false, error: 'Unable to connect to server. Please make sure PocketBase is running.' };
+                return { success: false, error: 'Service temporarily unavailable. Please try again later.' };
             }
         }
         
         // Handle network errors
         if (error && typeof error === 'object' && 'message' in error && 
             typeof error.message === 'string' && error.message.includes('fetch')) {
-            return { success: false, error: 'Unable to connect to server. Please make sure PocketBase is running.' };
+            return { success: false, error: 'Service temporarily unavailable. Please try again later.' };
         }
         
         const errorMessage = error && typeof error === 'object' && 'message' in error ? 
@@ -80,7 +80,7 @@ export async function signup(userData) {
             referringUser = referringUsers.items[0];
         } catch (referralError) {
             console.error('Error validating referral code:', referralError);
-            return { success: false, error: 'Unable to validate referral code. Please try again.' };
+            return { success: false, error: 'Service temporarily unavailable. Please try again later.' };
         }
 
         // Generate a unique referral code for the new user
@@ -141,14 +141,14 @@ export async function signup(userData) {
             }
             
             if (error.status === 0) {
-                return { success: false, error: 'Unable to connect to server. Please make sure PocketBase is running.' };
+                return { success: false, error: 'Service temporarily unavailable. Please try again later.' };
             }
         }
         
         // Handle network errors
         if (error && typeof error === 'object' && 'message' in error && 
             typeof error.message === 'string' && error.message.includes('fetch')) {
-            return { success: false, error: 'Unable to connect to server. Please make sure PocketBase is running.' };
+            return { success: false, error: 'Service temporarily unavailable. Please try again later.' };
         }
         
         const errorMessage = error && typeof error === 'object' && 'message' in error ? 

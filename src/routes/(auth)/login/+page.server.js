@@ -75,20 +75,20 @@ export const actions = {
                     if (error.status === 400) {
                         errorMessage = 'Invalid email or password';
                     } else if (error.status === 0) {
-                        errorMessage = 'Unable to connect to server. Please make sure PocketBase is running.';
+                        errorMessage = 'Service temporarily unavailable. Please try again later.';
                     } else if (error.status === 404) {
-                        errorMessage = 'PocketBase server not found. Please check the connection.';
+                        errorMessage = 'Service temporarily unavailable. Please try again later.';
                     }
                 }
                 
                 // Handle network errors
                 if ('message' in error && typeof error.message === 'string') {
                     if (error.message.includes('fetch')) {
-                        errorMessage = 'Unable to connect to server. Please make sure PocketBase is running.';
+                        errorMessage = 'Service temporarily unavailable. Please try again later.';
                     } else if (error.message.includes('Failed to authenticate')) {
                         errorMessage = 'Invalid email or password';
                     } else if (error.message.includes('timeout')) {
-                        errorMessage = 'Login request timed out. Please try again.';
+                        errorMessage = 'Request timed out. Please try again.';
                     }
                 }
             }

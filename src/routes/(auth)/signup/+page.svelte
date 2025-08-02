@@ -3,10 +3,9 @@
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
     import { onMount } from 'svelte';
-    import { testPocketBaseConnection, validateReferralCode } from '$lib/pocketbase-utils.js';
+    import { validateReferralCode } from '$lib/pocketbase-utils.js';
 
     let loading = false;
-    let connectionStatus = null;
     let referralCode = $state('');
     let referralValidation = $state(null);
     let validatingReferral = $state(false);
@@ -15,9 +14,6 @@
     let validationTimeout;
     
     onMount(async () => {
-        // Test PocketBase connection on page load
-        connectionStatus = await testPocketBaseConnection();
-        
         // Get referral code from URL if present
         const urlParams = new URLSearchParams(window.location.search);
         const urlReferralCode = urlParams.get('ref');
@@ -79,23 +75,7 @@
                 </div>
 
                 <!-- Signup Form Card -->
-                <!-- Signup Form Card -->
                 <div class="bg-[#2B2B2B] rounded-xl p-6 sm:p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-[#2B2B2B] hover:border-[#85D5C8]/20">
-                    {#if connectionStatus && !connectionStatus.connected}
-                        <div class="bg-[#C392EC]/10 border border-[#C392EC]/20 text-[#C392EC] px-4 py-3 rounded-lg mb-6">
-                            <div class="flex items-start gap-3">
-                                <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                                </svg>
-                                <div>
-                                    <strong>Connection Issue:</strong> {connectionStatus.message}
-                                    <br>
-                                    <small class="text-[#A0A0A0]">Please follow the instructions in POCKETBASE_SETUP.md to set up PocketBase.</small>
-                                </div>
-                            </div>
-                        </div>
-                    {/if}
-                    
                     {#if $page.form?.error}
                         <div class="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg mb-6">
                             <div class="flex items-start gap-3">

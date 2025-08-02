@@ -16,6 +16,22 @@
     let isLessonCompleted = $state(false);
     let showCompletionAnimation = $state(false);
     
+    // Helper function to safely parse completed lessons
+    function safeParseCompletedLessons(completedLessons) {
+        try {
+            if (!completedLessons) return [];
+            if (Array.isArray(completedLessons)) return completedLessons;
+            if (typeof completedLessons === 'string') {
+                if (completedLessons.trim() === '') return [];
+                return JSON.parse(completedLessons);
+            }
+            return [];
+        } catch (error) {
+            console.warn('Failed to parse completed lessons:', error);
+            return [];
+        }
+    }
+    
     // Calculate lesson position
     let currentLessonIndex = $state(0);
     let nextLesson = $state(null);
@@ -27,10 +43,8 @@
         previousLesson = currentLessonIndex > 0 ? lessons[currentLessonIndex - 1] : null;
         
         // Check if current lesson is completed
-        if (userProgress && userProgress.completed_lessons) {
-            const completedLessons = Array.isArray(userProgress.completed_lessons) 
-                ? userProgress.completed_lessons 
-                : JSON.parse(userProgress.completed_lessons || '[]');
+        if (userProgress) {
+            const completedLessons = safeParseCompletedLessons(userProgress.completed_lessons);
             isLessonCompleted = completedLessons.includes(lesson.id);
         }
     });
@@ -53,9 +67,7 @@
                 });
             } else {
                 // Update existing progress
-                const completedLessons = Array.isArray(userProgress.completed_lessons) 
-                    ? userProgress.completed_lessons 
-                    : JSON.parse(userProgress.completed_lessons || '[]');
+                const completedLessons = safeParseCompletedLessons(userProgress.completed_lessons);
                 
                 if (!completedLessons.includes(lesson.id)) {
                     completedLessons.push(lesson.id);
@@ -122,19 +134,15 @@
     
     // Calculate progress percentage
     function getProgressPercentage() {
-        if (!userProgress || !userProgress.completed_lessons) return 0;
-        const completedLessons = Array.isArray(userProgress.completed_lessons) 
-            ? userProgress.completed_lessons 
-            : JSON.parse(userProgress.completed_lessons || '[]');
+        if (!userProgress) return 0;
+        const completedLessons = safeParseCompletedLessons(userProgress.completed_lessons);
         return Math.round((completedLessons.length / totalLessons) * 100);
     }
     
     // Check if lesson is completed
     function isLessonCompletedById(lessonId) {
-        if (!userProgress || !userProgress.completed_lessons) return false;
-        const completedLessons = Array.isArray(userProgress.completed_lessons) 
-            ? userProgress.completed_lessons 
-            : JSON.parse(userProgress.completed_lessons || '[]');
+        if (!userProgress) return false;
+        const completedLessons = safeParseCompletedLessons(userProgress.completed_lessons);
         return completedLessons.includes(lessonId);
     }
     

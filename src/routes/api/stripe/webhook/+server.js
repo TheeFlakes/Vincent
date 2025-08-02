@@ -38,6 +38,11 @@ export async function POST({ request }) {
                 await handleCheckoutSessionExpired(expiredSession);
                 break;
 
+            case 'payment_intent.payment_failed':
+                const failedPayment = event.data.object;
+                await handlePaymentFailed(failedPayment);
+                break;
+
             default:
                 console.log(`Unhandled event type: ${event.type}`);
         }
@@ -92,7 +97,37 @@ async function handleCheckoutSessionCompleted(session) {
             payment_intent_id: session.payment_intent
         });
 
-        // Optionally create a payment record
+        // Create transaction record with the requested format
+        try {
+            // First try to find existing pending transaction
+            const existingTransactions = await pb.collection('transactions').getList(1, 1, {
+                filter: `user = "${userId}" && course = "${courseId}" && stripe_session_id = "${session.id}"`
+            });
+
+            if (existingTransactions.items.length > 0) {
+                // Update existing transaction
+                await pb.collection('transactions').update(existingTransactions.items[0].id, {
+                    stripe_payment_intent: session.payment_intent,
+                    status: 'completed'
+                });
+            } else {
+                // Create new transaction if none exists
+                await pb.collection('transactions').create({
+                    user: userId,
+                    course: courseId,
+                    amount: session.amount_total / 100, // Convert from cents to dollars
+                    currency: session.currency,
+                    stripe_session_id: session.id,
+                    stripe_payment_intent: session.payment_intent,
+                    status: 'completed'
+                });
+            }
+        } catch (err) {
+            console.error('Could not create/update transaction record:', err);
+            // Don't fail the enrollment if transaction record creation fails
+        }
+
+        // Optionally create a payment record (keeping for backward compatibility)
         await pb.collection('payments').create({
             user: userId,
             course: courseId,
@@ -123,12 +158,25 @@ async function handleCheckoutSessionExpired(session) {
     try {
         console.log('Processing expired checkout session:', session.id);
         
-        // You can implement logic here to handle abandoned carts
-        // For example, send an email reminder or analytics tracking
-        
         const { courseId, userId } = session.metadata;
         
         if (courseId && userId) {
+            // Update transaction status to expired/failed
+            try {
+                const existingTransactions = await pb.collection('transactions').getList(1, 1, {
+                    filter: `user = "${userId}" && course = "${courseId}" && stripe_session_id = "${session.id}"`
+                });
+
+                if (existingTransactions.items.length > 0) {
+                    await pb.collection('transactions').update(existingTransactions.items[0].id, {
+                        status: 'expired'
+                    });
+                    console.log('Updated transaction status to expired for session:', session.id);
+                }
+            } catch (err) {
+                console.error('Could not update transaction status:', err);
+            }
+            
             // Log the abandoned cart for analytics
             console.log('Cart abandoned for user:', userId, 'course:', courseId);
             
@@ -138,5 +186,33 @@ async function handleCheckoutSessionExpired(session) {
 
     } catch (error) {
         console.error('Error handling expired checkout session:', error);
+    }
+}
+
+/**
+ * @param {any} paymentIntent
+ */
+async function handlePaymentFailed(paymentIntent) {
+    try {
+        console.log('Processing failed payment:', paymentIntent.id);
+        
+        // Try to find transaction by payment intent and update status
+        try {
+            const existingTransactions = await pb.collection('transactions').getList(1, 50, {
+                filter: `stripe_payment_intent = "${paymentIntent.id}"`
+            });
+
+            for (const transaction of existingTransactions.items) {
+                await pb.collection('transactions').update(transaction.id, {
+                    status: 'failed'
+                });
+                console.log('Updated transaction status to failed for payment intent:', paymentIntent.id);
+            }
+        } catch (err) {
+            console.error('Could not update transaction status for failed payment:', err);
+        }
+
+    } catch (error) {
+        console.error('Error handling failed payment:', error);
     }
 }

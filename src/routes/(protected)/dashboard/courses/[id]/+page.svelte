@@ -17,6 +17,22 @@
     let showPaymentSuccess = $state(false);
     let pageLoading = $state(false);
     
+    // Helper function to safely parse completed lessons
+    function safeParseCompletedLessons(completedLessons) {
+        try {
+            if (!completedLessons) return [];
+            if (Array.isArray(completedLessons)) return completedLessons;
+            if (typeof completedLessons === 'string') {
+                if (completedLessons.trim() === '') return [];
+                return JSON.parse(completedLessons);
+            }
+            return [];
+        } catch (error) {
+            console.warn('Failed to parse completed lessons:', error, 'Input was:', completedLessons);
+            return [];
+        }
+    }
+    
     // Update reactive state when data prop changes
     $effect(() => {
         console.log('Course data received:', data);
@@ -26,6 +42,24 @@
             totalLessons = data.totalLessons || 0;
             userProgress = data.userProgress;
             isEnrolled = data.isEnrolled || false;
+            
+            // Debug enrollment status
+            console.log('Course details:', {
+                title: course?.title,
+                isFree: course?.isFree,
+                price: course?.price,
+                isEnrolled: isEnrolled,
+                userProgress: userProgress,
+                paymentStatus: userProgress?.payment_status,
+                stripeSessionId: userProgress?.stripe_session_id
+            });
+            
+            // Debug userProgress structure
+            if (userProgress) {
+                console.log('User progress received:', userProgress);
+                console.log('Completed lessons field:', userProgress.completed_lessons);
+                console.log('Type of completed lessons:', typeof userProgress.completed_lessons);
+            }
         }
     });
     
@@ -125,19 +159,15 @@
     
     // Calculate progress percentage
     function getProgressPercentage() {
-        if (!userProgress || !userProgress.completed_lessons) return 0;
-        const completedLessons = Array.isArray(userProgress.completed_lessons) 
-            ? userProgress.completed_lessons 
-            : JSON.parse(userProgress.completed_lessons || '[]');
+        if (!userProgress) return 0;
+        const completedLessons = safeParseCompletedLessons(userProgress.completed_lessons);
         return Math.round((completedLessons.length / totalLessons) * 100);
     }
     
     // Check if lesson is completed
     function isLessonCompleted(lessonId) {
-        if (!userProgress || !userProgress.completed_lessons) return false;
-        const completedLessons = Array.isArray(userProgress.completed_lessons) 
-            ? userProgress.completed_lessons 
-            : JSON.parse(userProgress.completed_lessons || '[]');
+        if (!userProgress) return false;
+        const completedLessons = safeParseCompletedLessons(userProgress.completed_lessons);
         return completedLessons.includes(lessonId);
     }
     
@@ -250,14 +280,15 @@
                                 ></div>
                             </div>
                             <p class="text-xs text-[#A0A0A0] mt-2">
-                                {JSON.parse(userProgress.completed_lessons || '[]').length} of {totalLessons} lessons completed
+                                {safeParseCompletedLessons(userProgress.completed_lessons).length} of {totalLessons} lessons completed
                             </p>
                         </div>
                     {/if}
 
                     <!-- Action Button -->
                     <div class="flex gap-3">
-                        {#if isEnrolled || course.isFree}
+                        {#if isEnrolled}
+                            <!-- User is enrolled - show continue/start learning -->
                             <button 
                                 onclick={startCourse}
                                 class="px-6 py-3 bg-[#C392EC] text-white rounded-lg font-medium hover:bg-[#C392EC]/80 transition-colors flex items-center gap-2"
@@ -265,37 +296,38 @@
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293H15M9 10V9a2 2 0 012-2h2a2 2 0 012 2v1M9 10H7a2 2 0 00-2 2v5a2 2 0 002 2h10a2 2 0 002-2v-5a2 2 0 00-2-2h-2"></path>
                                 </svg>
-                                {isEnrolled && userProgress && getProgressPercentage() > 0 ? 'Continue Learning' : 'Start Learning'}
+                                {userProgress && getProgressPercentage() > 0 ? 'Continue Learning' : 'Start Learning'}
                             </button>
-                            {#if course.isFree && !isEnrolled}
-                                <button 
-                                    onclick={handleEnroll}
-                                    disabled={isEnrolling}
-                                    class="px-6 py-3 bg-[#85D5C8] text-[#1A1A1A] rounded-lg font-medium hover:bg-[#85D5C8]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                >
-                                    {#if isEnrolling}
-                                        <svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Enrolling...
-                                    {:else}
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                        </svg>
-                                        Enroll for Free
-                                    {/if}
-                                </button>
-                            {/if}
+                        {:else if course.isFree}
+                            <!-- Free course, not enrolled - show enroll button -->
+                            <button 
+                                onclick={handleEnroll}
+                                disabled={isEnrolling}
+                                class="px-6 py-3 bg-[#85D5C8] text-[#1A1A1A] rounded-lg font-medium hover:bg-[#85D5C8]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                {#if isEnrolling}
+                                    <svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Enrolling...
+                                {:else}
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                    </svg>
+                                    Enroll for Free
+                                {/if}
+                            </button>
                         {:else}
+                            <!-- Paid course, not enrolled - show purchase button -->
                             <button 
                                 onclick={goToCheckout}
                                 class="px-6 py-3 bg-[#C392EC] text-white rounded-lg font-medium hover:bg-[#C392EC]/80 transition-colors flex items-center gap-2"
                             >
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l-1 8H6L5 9z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 2.5M7 13l2.5 2.5M17 21a2 2 0 100-4 2 2 0 000 4zM9 21a2 2 0 100-4 2 2 0 000 4z"></path>
                                 </svg>
-                                Purchase Course - {formatPrice(course)}
+                                Purchase Now - {formatPrice(course)}
                             </button>
                         {/if}
                     </div>

@@ -1,6 +1,65 @@
 import { pb } from './pocketbase.js';
 
 /**
+ * Get user's transaction for a specific course
+ * @param {string} userId - The user ID
+ * @param {string} courseId - The course ID
+ * @returns {Promise<object|null>} Transaction record or null
+ */
+export async function getUserCourseTransaction(userId, courseId) {
+    try {
+        const result = await pb.collection('transactions').getList(1, 1, {
+            filter: `user = "${userId}" && course = "${courseId}"`,
+            sort: '-created' // Get the most recent transaction
+        });
+        
+        return result.items.length > 0 ? result.items[0] : null;
+    } catch (error) {
+        console.error('Error fetching user course transaction:', error);
+        return null;
+    }
+}
+
+/**
+ * Check if user has successfully purchased a course
+ * @param {string} userId - The user ID
+ * @param {string} courseId - The course ID
+ * @returns {Promise<boolean>} True if user has completed transaction for the course
+ */
+export async function hasUserPurchasedCourse(userId, courseId) {
+    try {
+        const result = await pb.collection('transactions').getList(1, 1, {
+            filter: `user = "${userId}" && course = "${courseId}" && status = "completed"`
+        });
+        
+        return result.items.length > 0;
+    } catch (error) {
+        console.error('Error checking course purchase status:', error);
+        return false;
+    }
+}
+
+/**
+ * Get all transactions for a user
+ * @param {string} userId - The user ID
+ * @param {number} page - Page number (default: 1)
+ * @param {number} perPage - Items per page (default: 20)
+ * @returns {Promise<object>} Transactions list
+ */
+export async function getUserTransactions(userId, page = 1, perPage = 20) {
+    try {
+        return await pb.collection('transactions').getList(page, perPage, {
+            filter: `user = "${userId}"`,
+            sort: '-created',
+            expand: 'course'
+        });
+    } catch (error) {
+        console.error('Error fetching user transactions:', error);
+        return { items: [], totalItems: 0, totalPages: 0 };
+    }
+}
+
+/**
  * Test PocketBase connection
  * @returns {Promise<object>} Connection status
  */
@@ -22,7 +81,7 @@ export async function testPocketBaseConnection() {
     } catch (error) {
         return { 
             connected: false, 
-            message: 'Unable to connect to PocketBase. Make sure it is running on https://vin254.pockethost.io' 
+            message: 'Service temporarily unavailable. Please try again later.' 
         };
     }
 }

@@ -45,7 +45,29 @@ export async function load({ params, locals }) {
         
         if (userProgressResult.items.length > 0) {
             userProgress = userProgressResult.items[0];
-            isEnrolled = true;
+            
+            console.log('Found user progress record:', {
+                courseId: params.id,
+                userId: locals.user.id,
+                courseName: course.title,
+                isFree: course.isFree,
+                paymentStatus: userProgress.payment_status,
+                stripeSessionId: userProgress.stripe_session_id
+            });
+            
+            // For paid courses, verify payment status
+            if (!course.isFree) {
+                // Only consider enrolled if payment_status is 'completed' or if there's a valid stripe_session_id
+                isEnrolled = userProgress.payment_status === 'completed' || 
+                            (userProgress.stripe_session_id && userProgress.stripe_session_id.length > 0);
+                console.log('Paid course enrollment check:', { isEnrolled, paymentStatus: userProgress.payment_status, hasSessionId: !!userProgress.stripe_session_id });
+            } else {
+                // For free courses, just having a progress record is enough
+                isEnrolled = true;
+                console.log('Free course - user is enrolled');
+            }
+        } else {
+            console.log('No user progress record found for course:', params.id, 'user:', locals.user.id);
         }
 
         return {

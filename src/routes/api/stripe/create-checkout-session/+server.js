@@ -83,6 +83,22 @@ export async function POST({ request, locals }) {
             }
         });
 
+        // Create a pending transaction record
+        try {
+            await pb.collection('transactions').create({
+                user: locals.user.id,
+                course: courseId,
+                amount: Math.round(course.price * 100) / 100, // Ensure decimal precision
+                currency: 'usd',
+                stripe_session_id: session.id,
+                stripe_payment_intent: null, // Will be updated when payment completes
+                status: 'pending'
+            });
+        } catch (err) {
+            console.error('Could not create pending transaction record:', err);
+            // Don't fail the checkout creation if transaction record creation fails
+        }
+
         return json({ 
             sessionId: session.id,
             url: session.url 
