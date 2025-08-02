@@ -8,10 +8,12 @@
     let referralStats = $state(data.referralStats || {});
     let copied = $state(false);
     
-    // Generate referral link
-    $: referralLink = typeof window !== 'undefined' 
-        ? `${window.location.origin}/signup?ref=${referralStats.referralCode}`
-        : '';
+    // Generate referral link using $derived
+    let referralLink = $derived(
+        typeof window !== 'undefined' 
+            ? `${window.location.origin}/signup?ref=${referralStats.referralCode}`
+            : ''
+    );
     
     // Copy referral link to clipboard
     async function copyReferralLink() {

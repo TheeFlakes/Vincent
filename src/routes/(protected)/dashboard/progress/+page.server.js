@@ -30,8 +30,9 @@ export async function load({ locals }) {
             // For each course, get the total lesson count
             for (const course of coursesResult) {
                 try {
-                    const lessonsResult = await pb.collection('lessons').getList(1, 1, {
-                        filter: `course = "${course.id}"`,
+                    // Try to get lessons count from course_lessons collection
+                    const lessonsResult = await pb.collection('course_lessons').getList(1, 1, {
+                        filter: `module = "${course.id}"`,
                         requestKey: null
                     });
                     
@@ -41,10 +42,25 @@ export async function load({ locals }) {
                     });
                 } catch (err) {
                     console.error(`Error fetching lessons for course ${course.id}:`, err);
-                    coursesWithLessons.push({
-                        ...course,
-                        totalLessons: 0
-                    });
+                    // If course_lessons collection doesn't exist or has issues, try lessons collection as fallback
+                    try {
+                        const fallbackResult = await pb.collection('lessons').getList(1, 1, {
+                            filter: `course = "${course.id}"`,
+                            requestKey: null
+                        });
+                        
+                        coursesWithLessons.push({
+                            ...course,
+                            totalLessons: fallbackResult.totalItems
+                        });
+                    } catch (fallbackErr) {
+                        console.error(`Error fetching from fallback lessons collection for course ${course.id}:`, fallbackErr);
+                        // If both collections fail, use 0
+                        coursesWithLessons.push({
+                            ...course,
+                            totalLessons: 0
+                        });
+                    }
                 }
             }
         }
