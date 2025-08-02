@@ -11,3 +11,8 @@ export const currentUser = writable(pb.authStore.model);
 pb.authStore.onChange((auth) => {
     currentUser.set(pb.authStore.model);
 });
+
+// Helper function to create a server-side PocketBase instance
+export function createServerPB() {
+    return new PocketBase('https://vin254.pockethost.io');
+}

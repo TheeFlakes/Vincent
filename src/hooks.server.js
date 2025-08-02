@@ -1,21 +1,19 @@
 import { redirect } from '@sveltejs/kit';
-import { pb } from '$lib/pocketbase.js';
+import { createServerPB } from '$lib/pocketbase.js';
 
 export async function handle({ event, resolve }) {
-    // Initialize a fresh PocketBase instance for this request
-    const { pb } = await import('$lib/pocketbase.js');
-    
-    // Clear auth store first
-    pb.authStore.clear();
+    // Create a fresh PocketBase instance for this request
+    const pb = createServerPB();
     
     // Get the auth token from cookies if available
     const authCookie = event.cookies.get('pb_auth');
     if (authCookie) {
         try {
+            // Load auth from cookie
             pb.authStore.loadFromCookie(`pb_auth=${authCookie}`);
             
-            // Verify the auth is still valid
-            if (pb.authStore.isValid) {
+            // Only verify if we have a valid token structure
+            if (pb.authStore.isValid && pb.authStore.token) {
                 try {
                     // Try to refresh the auth to make sure it's still valid
                     await pb.collection('users').authRefresh();
@@ -31,6 +29,9 @@ export async function handle({ event, resolve }) {
             pb.authStore.clear();
             event.cookies.delete('pb_auth', { path: '/' });
         }
+    } else {
+        // No cookie found, ensure auth store is clear
+        pb.authStore.clear();
     }
 
     // Define protected routes
