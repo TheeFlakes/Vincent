@@ -6,6 +6,7 @@ let stripePromise = null;
 
 export function getStripe() {
     if (!stripePromise) {
+        console.log('Initializing Stripe with key:', PUBLIC_STRIPE_PUBLISHABLE_KEY ? 'Key found' : 'Key missing');
         stripePromise = loadStripe(PUBLIC_STRIPE_PUBLISHABLE_KEY);
     }
     return stripePromise;

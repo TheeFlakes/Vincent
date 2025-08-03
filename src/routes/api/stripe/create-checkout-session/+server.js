@@ -69,7 +69,7 @@ export async function POST({ request, locals }) {
             line_items: lineItems,
             mode: mode,
             success_url: `${request.headers.get('origin')}/dashboard/courses/${courseId}?session_id={CHECKOUT_SESSION_ID}&enrolled=true`,
-            cancel_url: `${request.headers.get('origin')}/dashboard/courses/${courseId}/checkout?canceled=true`,
+            cancel_url: `${request.headers.get('origin')}/dashboard/courses/${courseId}?canceled=true`,
             customer_email: locals.user.email,
             metadata: {
                 courseId: courseId,
