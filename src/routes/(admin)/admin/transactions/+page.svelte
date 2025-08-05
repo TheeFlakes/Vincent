@@ -29,8 +29,8 @@
         
         // Handle different currencies
         let locale = 'en-US';
-        if (currencyCode === 'NGN') {
-            locale = 'en-NG';
+        if (currencyCode === 'KES') {
+            locale = 'en-KE';
         } else if (currencyCode === 'GBP') {
             locale = 'en-GB';
         } else if (currencyCode === 'EUR') {

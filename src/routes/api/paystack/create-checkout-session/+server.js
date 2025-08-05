@@ -38,7 +38,7 @@ export async function POST({ request, locals }) {
             // No enrollment found, continue
         }
 
-        // Convert USD to NGN for Paystack (which supports NGN)
+        // Convert USD to KES for Paystack (which supports KES)
         let finalAmount = amount || course.price;
         
         // Ensure we have a valid amount
@@ -46,19 +46,19 @@ export async function POST({ request, locals }) {
             return json({ error: 'Invalid course price' }, { status: 400 });
         }
 
-        // Convert USD to NGN (1 USD ≈ 1600 NGN as of current rates)
-        const usdToNgnRate = 1600;
-        const amountInNGN = Math.round(finalAmount * usdToNgnRate);
+        // Convert USD to KES (1 USD ≈ 150 KES as of current rates)
+        const usdToKesRate = 150;
+        const amountInKES = Math.round(finalAmount * usdToKesRate);
 
         // Generate unique reference
         const reference = `course_${courseId}_${locals.user.id}_${Date.now()}`;
 
-        // Initialize Paystack transaction with NGN currency
+        // Initialize Paystack transaction with KES currency (or default)
         const initializeData = {
             email: email || locals.user.email,
-            amount: amountInNGN * 100, // Convert to kobo for Paystack (NGN * 100)
+            amount: amountInKES * 100, // Convert to cents for Paystack (KES * 100)
             reference: reference,
-            currency: 'NGN', // Use NGN currency which is supported
+            // Don't specify currency - let Paystack use account default (KES)
             name: locals.user.name || locals.user.email || 'Course Student',
             callback_url: `${request.headers.get('origin')}/dashboard/courses/${courseId}?payment_reference=${reference}&enrolled=true`,
             metadata: {
@@ -67,8 +67,8 @@ export async function POST({ request, locals }) {
                 userEmail: locals.user.email || email,
                 courseName: course.title,
                 originalAmountUSD: finalAmount, // Store original USD amount
-                convertedAmountNGN: amountInNGN, // Store converted NGN amount
-                conversionRate: usdToNgnRate,
+                convertedAmountKES: amountInKES, // Store converted KES amount
+                conversionRate: usdToKesRate,
                 custom_fields: [
                     {
                         display_name: "Course",
@@ -104,8 +104,8 @@ export async function POST({ request, locals }) {
                 currency: 'USD', // Store as USD for display purposes
                 paystack_reference: reference,
                 paystack_access_code: transaction.data.access_code,
-                paystack_amount_ngn: amountInNGN, // Store converted NGN amount
-                paystack_currency: 'NGN', // Actual Paystack currency
+                paystack_amount_kes: amountInKES, // Store converted KES amount
+                paystack_currency: 'KES', // Actual Paystack currency
                 status: 'pending',
                 // Map Paystack fields to your schema
                 stripe_session_id: transaction.data.access_code, // Use access_code as session identifier

@@ -10,7 +10,7 @@ const exampleTransactionData = {
     "user": "RELATION_RECORD_ID",
     "course": "RELATION_RECORD_ID", 
     "amount": 123,
-    "currency": "ngn",
+    "currency": "kes",
     "paystack_reference": "course_123_user_456_1234567890",
     "paystack_access_code": "30fj10bf7mmlo3h",
     "status": "pending" // Can be: "pending", "completed", "failed", "expired"

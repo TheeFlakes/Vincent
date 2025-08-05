@@ -92,8 +92,8 @@
             return 'Free';
         }
         const usdPrice = course.price;
-        const ngnPrice = Math.round(usdPrice * 1600); // Convert to NGN
-        return `$${usdPrice} / ₦${ngnPrice.toLocaleString()}`;
+        const kesPrice = Math.round(usdPrice * 150); // Convert to KES
+        return `$${usdPrice} / KSh ${kesPrice.toLocaleString()}`;
     }
     
     // Get price badge class
@@ -253,13 +253,13 @@
                 throw new Error('Connection issue - please check your internet connection');
             }
             
-            // Convert USD to NGN (approximate rate: 1 USD = 1600 NGN)
+            // Convert USD to KES (approximate rate: 1 USD = 150 KES)
             // You should get real-time rates from an API in production
-            const amountInNGN = Math.round(course.price * 1600);
+            const amountInKES = Math.round(course.price * 150);
             
             await createPaystackCheckout(
                 course.id, 
-                amountInNGN, 
+                course.price, // Send original USD amount - server will handle KES conversion
                 user.email
                 // No currency specified - let Paystack use account default
             );
