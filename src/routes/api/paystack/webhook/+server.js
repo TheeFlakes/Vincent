@@ -112,6 +112,9 @@ async function handleChargeSuccess(charge) {
         // Update transaction record
         await updateTransactionStatus(charge.reference, 'paid', charge);
 
+        // Process referral commission (10% to direct upline)
+        await processReferralCommission(userId, charge);
+
         console.log('Successfully enrolled user:', userId, 'in course:', courseId);
 
     } catch (error) {
@@ -132,6 +135,73 @@ async function handleChargeFailed(charge) {
 
     } catch (error) {
         console.error('Error handling failed charge:', error);
+    }
+}
+
+/**
+ * Process referral commission for successful purchase
+ * @param {string} userId - User who made the purchase
+ * @param {any} charge - Paystack charge data
+ */
+async function processReferralCommission(userId, charge) {
+    try {
+        console.log('Processing referral commission for user:', userId);
+
+        // Get the user who made the purchase
+        const purchasingUser = await pb.collection('users').getOne(userId, {
+            expand: 'referredBy'
+        });
+
+        // Check if user has an upline (was referred by someone)
+        if (!purchasingUser.referredBy || !purchasingUser.expand?.referredBy) {
+            console.log('User has no upline, no commission to process');
+            return;
+        }
+
+        const upline = purchasingUser.expand.referredBy;
+        const purchaseAmount = charge.amount / 100; // Convert from kobo to main currency
+        const commissionRate = 0.10; // 10% commission
+        const commissionAmount = purchaseAmount * commissionRate;
+
+        console.log(`Calculating commission: ${purchaseAmount} * ${commissionRate} = ${commissionAmount}`);
+
+        // Create commission record in transactions collection
+        await pb.collection('transactions').create({
+            user: upline.id,
+            course: charge.metadata.courseId,
+            amount: commissionAmount,
+            currency: charge.currency || 'KES',
+            paystack_reference: `commission_${charge.reference}`,
+            paystack_charge_id: charge.id,
+            status: 'completed',
+            transaction_type: 'commission',
+            commission_from_user: userId,
+            commission_rate: commissionRate,
+            original_transaction_ref: charge.reference,
+            gateway_response: 'Commission for referral',
+            paid_at: charge.paid_at || new Date().toISOString(),
+            created: new Date().toISOString(),
+            updated: new Date().toISOString()
+        });
+
+        // Update the original transaction with commission info
+        try {
+            const originalTransaction = await pb.collection('transactions').getFirstListItem(
+                `paystack_reference = "${charge.reference}"`
+            );
+            
+            await pb.collection('transactions').update(originalTransaction.id, {
+                referral_commission_paid: commissionAmount,
+                commission_to_user: upline.id
+            });
+        } catch (err) {
+            console.error('Could not update original transaction with commission info:', err);
+        }
+
+        console.log(`Successfully processed ${commissionAmount} commission for upline:`, upline.id);
+
+    } catch (error) {
+        console.error('Error processing referral commission:', error);
     }
 }
 

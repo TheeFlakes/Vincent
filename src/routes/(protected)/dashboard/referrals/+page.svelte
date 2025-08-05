@@ -8,6 +8,14 @@
     let referralStats = $state(data.referralStats || {});
     let copied = $state(false);
     
+    // Format currency
+    function formatCurrency(amount) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(amount);
+    }
+    
     // Generate referral link using $derived
     let referralLink = $derived(
         typeof window !== 'undefined' 
@@ -158,11 +166,12 @@
                         <div class="text-sm text-[#A0A0A0]">Total Referrals</div>
                     </div>
 
-                    <!-- Earnings Placeholder -->
+                    <!-- Earnings -->
                     <div class="text-center p-4 bg-[#1A1A1A] rounded-lg border border-[#3B3B3B]">
-                        <div class="text-2xl font-bold text-[#F59E0B] mb-1">$0.00</div>
+                        <div class="text-2xl font-bold text-[#F59E0B] mb-1">
+                            {formatCurrency(referralStats.totalEarnings || 0)}
+                        </div>
                         <div class="text-sm text-[#A0A0A0]">Total Earnings</div>
-                        <div class="text-xs text-[#A0A0A0] mt-1">(Coming Soon)</div>
                     </div>
                 </div>
             </div>
@@ -246,7 +255,7 @@
                     </div>
                     <h3 class="text-lg font-semibold text-[#F0F0F0] mb-2">Earn Commissions</h3>
                     <p class="text-[#A0A0A0] text-sm">
-                        Earn commissions when your referrals make purchases (Coming Soon)
+                        Earn 10% commission when your referrals purchase courses
                     </p>
                 </div>
             </div>

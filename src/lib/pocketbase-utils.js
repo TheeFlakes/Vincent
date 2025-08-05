@@ -354,9 +354,23 @@ export async function getReferralStats(userId) {
             fields: 'referralCode'
         });
 
+        // Get commission earnings for this user
+        let totalEarnings = 0;
+        try {
+            const commissionTransactions = await pb.collection('transactions').getFullList({
+                filter: `user = "${userId}" && transaction_type = "commission"`,
+                fields: 'amount',
+                requestKey: null
+            });
+            totalEarnings = commissionTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+        } catch (err) {
+            console.error('Error fetching commission earnings:', err);
+        }
+
         return {
             referralCode: user.referralCode,
             totalReferrals: referredUsers.length,
+            totalEarnings: totalEarnings,
             referredUsers: referredUsers.map(user => ({
                 id: user.id,
                 name: user.name,
@@ -369,6 +383,7 @@ export async function getReferralStats(userId) {
         return {
             referralCode: '',
             totalReferrals: 0,
+            totalEarnings: 0,
             referredUsers: []
         };
     }

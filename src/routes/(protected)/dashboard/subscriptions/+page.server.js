@@ -52,11 +52,24 @@ export async function load({ locals, url }) {
                         }
                     }
 
+                    // Calculate commission earned from this specific course
+                    let courseCommission = 0;
+                    try {
+                        const courseCommissionTx = await pb.collection('transactions').getFullList({
+                            filter: `user = "${locals.user.id}" && course = "${subscription.course}" && transaction_type = "commission"`,
+                            requestKey: null
+                        });
+                        courseCommission = courseCommissionTx.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+                    } catch (err) {
+                        console.log('Error fetching course commission:', err);
+                    }
+
                     return {
                         ...subscription,
                         userProgress,
                         isEnrolled,
-                        nextLessonId
+                        nextLessonId,
+                        referralCommission: courseCommission
                     };
                 } catch (err) {
                     console.log('Error fetching progress for subscription:', subscription.id);
@@ -67,7 +80,14 @@ export async function load({ locals, url }) {
 
         // Calculate totals
         const totalSpent = subscriptions.reduce((sum, sub) => sum + (sub.amountPaid || 0), 0);
-        const totalCommissions = subscriptions.reduce((sum, sub) => sum + (sub.referralCommission || 0), 0);
+        
+        // Calculate total commissions earned by this user from referrals
+        const commissionTransactions = await pb.collection('transactions').getFullList({
+            filter: `user = "${locals.user.id}" && transaction_type = "commission"`,
+            requestKey: null
+        });
+        
+        const totalCommissions = commissionTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
         return {
             user: locals.user,
