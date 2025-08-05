@@ -20,19 +20,40 @@ export async function getUserCourseTransaction(userId, courseId) {
     }
 }
 
+// Simple cache for purchase checks
+const purchaseCache = new Map();
+
 /**
- * Check if user has successfully purchased a course
+ * Check if user has successfully purchased a course (with caching)
  * @param {string} userId - The user ID
  * @param {string} courseId - The course ID
  * @returns {Promise<boolean>} True if user has completed transaction for the course
  */
 export async function hasUserPurchasedCourse(userId, courseId) {
+    // Simple in-memory cache to avoid repeated DB calls
+    const cacheKey = `${userId}-${courseId}`;
+    const cacheExpiry = 5 * 60 * 1000; // 5 minutes
+    
+    const cached = purchaseCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < cacheExpiry) {
+        return cached.value;
+    }
+    
     try {
         const result = await pb.collection('transactions').getList(1, 1, {
-            filter: `user = "${userId}" && course = "${courseId}" && status = "completed"`
+            filter: `user = "${userId}" && course = "${courseId}" && status = "completed"`,
+            requestKey: `purchase-check-${cacheKey}` // Prevent duplicate requests
         });
         
-        return result.items.length > 0;
+        const purchased = result.items.length > 0;
+        
+        // Cache the result
+        purchaseCache.set(cacheKey, {
+            value: purchased,
+            timestamp: Date.now()
+        });
+        
+        return purchased;
     } catch (error) {
         console.error('Error checking course purchase status:', error);
         return false;

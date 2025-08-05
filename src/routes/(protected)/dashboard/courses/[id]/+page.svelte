@@ -2,7 +2,7 @@
     import { currentUser, pb } from '$lib/pocketbase.js';
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
-    import { createCheckoutSession } from '$lib/stripe-client.js';
+    import { createPaystackCheckout } from '$lib/paystack-client.js';
     
     let { data } = $props();
     
@@ -53,7 +53,7 @@
                 isEnrolled: isEnrolled,
                 userProgress: userProgress,
                 paymentStatus: userProgress?.payment_status,
-                stripeSessionId: userProgress?.stripe_session_id
+                paystackReference: userProgress?.paystack_reference
             });
             
             // Debug userProgress structure
@@ -68,20 +68,20 @@
     // Check for enrollment success from URL params
     $effect(() => {
         const enrolled = $page.url.searchParams.get('enrolled');
-        const sessionId = $page.url.searchParams.get('session_id');
+        const paymentReference = $page.url.searchParams.get('payment_reference');
         
         if (enrolled === 'true') {
             showEnrollmentSuccess = true;
             
-            // If there's also a session_id, it means payment was successful
-            if (sessionId) {
+            // If there's a payment_reference, it means payment was successful
+            if (paymentReference) {
                 showPaymentSuccess = true;
             }
             
             // Clear the parameters
             const url = new URL($page.url);
             url.searchParams.delete('enrolled');
-            url.searchParams.delete('session_id');
+            url.searchParams.delete('payment_reference');
             goto(url.toString(), { replaceState: true });
         }
     });
@@ -91,7 +91,9 @@
         if (course.isFree) {
             return 'Free';
         }
-        return `$${course.price}`;
+        const usdPrice = course.price;
+        const ngnPrice = Math.round(usdPrice * 1600); // Convert to NGN
+        return `$${usdPrice} / ₦${ngnPrice.toLocaleString()}`;
     }
     
     // Get price badge class
@@ -108,40 +110,132 @@
         
         isEnrolling = true;
         try {
-            // Create enrollment record for free course
-            userProgress = await pb.collection('user_progress').create({
-                user: user.id,
-                course: course.id,
-                completed_lessons: [],
-                current_lesson: null,
-                completion_percentage: 0,
-                last_accessed: new Date().toISOString()
-            });
+            console.log('Starting enrollment for free course:', course.id);
             
-            isEnrolled = true;
-            showEnrollmentSuccess = true;
+            // Add retry logic for enrollment
+            let attempts = 0;
+            const maxAttempts = 3;
+            
+            while (attempts < maxAttempts) {
+                try {
+                    // Create enrollment record for free course
+                    userProgress = await pb.collection('user_progress').create({
+                        user: user.id,
+                        course: course.id,
+                        completed_lessons: [],
+                        current_lesson: null,
+                        completion_percentage: 0,
+                        last_accessed: new Date().toISOString(),
+                        payment_status: 'completed' // Free courses are automatically completed
+                    });
+                    
+                    isEnrolled = true;
+                    showEnrollmentSuccess = true;
+                    console.log('Enrollment successful:', userProgress);
+                    break;
+                    
+                } catch (enrollErr) {
+                    attempts++;
+                    console.error(`Enrollment attempt ${attempts} failed:`, enrollErr);
+                    
+                    if (attempts >= maxAttempts) {
+                        throw enrollErr;
+                    }
+                    
+                    // Wait before retry
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+                }
+            }
             
         } catch (err) {
-            console.error('Enrollment failed:', err);
-            alert('Failed to enroll in course. Please try again.');
+            console.error('Enrollment failed after all attempts:', err);
+            
+            // Better error messages
+            let errorMessage = 'Failed to enroll in course. ';
+            if (err.message.includes('timeout') || err.message.includes('fetch')) {
+                errorMessage += 'Connection issue - please check your internet and try again.';
+            } else if (err.status === 400) {
+                errorMessage += 'You may already be enrolled.';
+            } else {
+                errorMessage += 'Please try again in a moment.';
+            }
+            
+            alert(errorMessage);
         } finally {
             isEnrolling = false;
         }
     }
     
-    // Start course or continue learning
-    function startCourse() {
-        if (lessons.length > 0) {
+    // Start course or continue learning  
+    async function startCourse() {
+        console.log('=== START COURSE DEBUG ===');
+        console.log('Course ID:', course?.id);
+        console.log('Course Title:', course?.title);
+        console.log('Is Enrolled:', isEnrolled);
+        console.log('Is Free Course:', course?.isFree);
+        console.log('Lessons Count:', lessons?.length);
+        console.log('User Progress:', userProgress);
+        console.log('Lessons Array:', lessons);
+        
+        if (!course || !course.id) {
+            alert('Course data is not loaded properly. Please refresh the page.');
+            return;
+        }
+        
+        if (lessons.length === 0) {
+            alert('This course doesn\'t have any lessons yet. Please check back later.');
+            return;
+        }
+        
+        // Check if user is actually enrolled
+        if (!isEnrolled && !course.isFree) {
+            alert('You need to purchase this course first.');
+            return;
+        }
+        
+        try {
             // Find the current lesson or start from the first one
             let targetLessonId = lessons[0].id;
             
             if (userProgress && userProgress.current_lesson) {
                 // Continue from where user left off
-                targetLessonId = userProgress.current_lesson;
+                const currentLesson = lessons.find(lesson => lesson.id === userProgress.current_lesson);
+                if (currentLesson) {
+                    targetLessonId = userProgress.current_lesson;
+                    console.log('Continuing from lesson:', targetLessonId);
+                } else {
+                    console.log('Current lesson not found, starting from first lesson');
+                }
+            } else {
+                console.log('No previous progress, starting from first lesson');
             }
             
-            goto(`/dashboard/courses/${course.id}/lessons/${targetLessonId}`);
+            console.log('Target Lesson ID:', targetLessonId);
+            
+            // Use a more reliable navigation method
+            const lessonUrl = `/dashboard/courses/${course.id}/lessons/${targetLessonId}`;
+            console.log('Navigation URL:', lessonUrl);
+            
+            // Add a small delay to ensure state is stable
+            setTimeout(async () => {
+                try {
+                    console.log('Attempting navigation...');
+                    await goto(lessonUrl);
+                    console.log('Navigation successful');
+                } catch (navError) {
+                    console.error('Navigation failed:', navError);
+                    // Fallback: try direct window navigation
+                    console.log('Trying fallback navigation');
+                    window.location.href = lessonUrl;
+                }
+            }, 100);
+            
+        } catch (error) {
+            console.error('Error starting course:', error);
+            alert('Failed to start the course. Please try again.');
         }
+        
+        console.log('=== END START COURSE DEBUG ===');
     }
     
     // Go to checkout for paid courses
@@ -150,11 +244,39 @@
         
         isProcessingPayment = true;
         try {
-            console.log('Starting checkout for course:', course.id);
-            await createCheckoutSession(course.id);
+            console.log('Starting Paystack checkout for course:', course.id);
+            
+            // Add connection check before checkout
+            try {
+                await fetch('/api/auth-status');
+            } catch (connectionErr) {
+                throw new Error('Connection issue - please check your internet connection');
+            }
+            
+            // Convert USD to NGN (approximate rate: 1 USD = 1600 NGN)
+            // You should get real-time rates from an API in production
+            const amountInNGN = Math.round(course.price * 1600);
+            
+            await createPaystackCheckout(
+                course.id, 
+                amountInNGN, 
+                user.email
+                // No currency specified - let Paystack use account default
+            );
         } catch (error) {
-            console.error('Checkout failed:', error);
-            alert(`Failed to create checkout session: ${error.message}. Please try again.`);
+            console.error('Paystack checkout failed:', error);
+            
+            // Better error handling
+            let errorMessage = 'Failed to create checkout session. ';
+            if (error.message.includes('Connection') || error.message.includes('fetch')) {
+                errorMessage += 'Please check your internet connection and try again.';
+            } else if (error.message.includes('timeout')) {
+                errorMessage += 'Request timed out - please try again.';
+            } else {
+                errorMessage += error.message || 'Please try again.';
+            }
+            
+            alert(errorMessage);
         } finally {
             isProcessingPayment = false;
         }
@@ -224,6 +346,7 @@
         </div>
     {:else}
     <div class="px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 sm:py-8 md:py-12 lg:py-16">
+        
         <!-- Back button -->
         <button 
             onclick={goBack}
@@ -303,8 +426,11 @@
                         {#if isEnrolled}
                             <!-- User is enrolled - show continue/start learning -->
                             <button 
-                                onclick={startCourse}
-                                class="px-6 py-3 bg-[#C392EC] text-white rounded-lg font-medium hover:bg-[#C392EC]/80 transition-colors flex items-center gap-2"
+                                onclick={() => {
+                                    console.log('Start Learning button clicked!');
+                                    startCourse();
+                                }}
+                                class="w-full px-6 py-3 bg-[#C392EC] text-white rounded-lg font-medium hover:bg-[#C392EC]/80 transition-colors flex items-center justify-center gap-2"
                             >
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293H15M9 10V9a2 2 0 012-2h2a2 2 0 012 2v1M9 10H7a2 2 0 00-2 2v5a2 2 0 002 2h10a2 2 0 002-2v-5a2 2 0 00-2-2h-2"></path>
@@ -314,9 +440,12 @@
                         {:else if course.isFree}
                             <!-- Free course, not enrolled - show enroll button -->
                             <button 
-                                onclick={handleEnroll}
+                                onclick={() => {
+                                    console.log('Enroll for Free button clicked!');
+                                    handleEnroll();
+                                }}
                                 disabled={isEnrolling}
-                                class="px-6 py-3 bg-[#85D5C8] text-[#1A1A1A] rounded-lg font-medium hover:bg-[#85D5C8]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                class="w-full px-6 py-3 bg-[#85D5C8] text-[#1A1A1A] rounded-lg font-medium hover:bg-[#85D5C8]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {#if isEnrolling}
                                     <svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">

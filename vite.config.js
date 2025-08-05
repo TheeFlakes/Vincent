@@ -27,7 +27,7 @@ export default defineConfig({
 		minify: 'esbuild'
 	},
 	optimizeDeps: {
-		include: ['@stripe/stripe-js', 'pocketbase', 'stripe'],
+		include: ['pocketbase', 'paystack'],
 		exclude: ['lightningcss']
 	},
 	ssr: {

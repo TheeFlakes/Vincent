@@ -10,9 +10,9 @@ const exampleTransactionData = {
     "user": "RELATION_RECORD_ID",
     "course": "RELATION_RECORD_ID", 
     "amount": 123,
-    "currency": "usd",
-    "stripe_session_id": "cs_test_...",
-    "stripe_payment_intent": "pi_...",
+    "currency": "ngn",
+    "paystack_reference": "course_123_user_456_1234567890",
+    "paystack_access_code": "30fj10bf7mmlo3h",
     "status": "pending" // Can be: "pending", "completed", "failed", "expired"
 };
 
@@ -85,16 +85,16 @@ async function getTransactionsByStatus(status, page = 1, perPage = 50) {
     }
 }
 
-// How to get transaction by Stripe session ID
-async function getTransactionBySessionId(sessionId) {
+// How to get transaction by Paystack reference
+async function getTransactionByReference(reference) {
     try {
         const result = await pb.collection('transactions').getList(1, 1, {
-            filter: `stripe_session_id = "${sessionId}"`,
+            filter: `paystack_reference = "${reference}"`,
             expand: 'user,course'
         });
         return result.items.length > 0 ? result.items[0] : null;
     } catch (error) {
-        console.error('Error fetching transaction by session ID:', error);
+        console.error('Error fetching transaction by reference:', error);
         return null;
     }
 }
@@ -129,36 +129,29 @@ async function demonstrateTransactionSystem() {
     
     console.log('1️⃣ INITIAL TRANSACTION CREATION (Status: "pending")');
     console.log('   ┌─ When: User clicks "Purchase Course" button');
-    console.log('   ├─ Where: /api/stripe/create-checkout-session');
+    console.log('   ├─ Where: /api/paystack/create-checkout-session');
     console.log('   ├─ Action: Pending transaction record created in DB');
-    console.log('   └─ Data: user, course, amount, currency, stripe_session_id, status="pending"\n');
+    console.log('   └─ Data: user, course, amount, currency, paystack_reference, status="pending"\n');
     
     console.log('2️⃣ TRANSACTION UPDATE (Status: "completed")');
-    console.log('   ┌─ When: User successfully pays with Stripe');
-    console.log('   ├─ Where: /api/stripe/webhook (checkout.session.completed)');
+    console.log('   ┌─ When: User successfully pays with Paystack');
+    console.log('   ├─ Where: /api/paystack/webhook (charge.success)');
     console.log('   ├─ Action: Transaction record updated in DB');
-    console.log('   └─ Data: stripe_payment_intent added, status="completed"\n');
+    console.log('   └─ Data: paystack_charge_id added, status="completed"\n');
     
     console.log('3️⃣ FAILED TRANSACTION TRACKING (Status: "failed")');
     console.log('   ┌─ When: Payment fails');
-    console.log('   ├─ Where: /api/stripe/webhook (payment_intent.payment_failed)');
+    console.log('   ├─ Where: /api/paystack/webhook (charge.failed)');
     console.log('   ├─ Action: Transaction record updated in DB');
     console.log('   └─ Data: status="failed"\n');
-    
-    console.log('4️⃣ EXPIRED TRANSACTION TRACKING (Status: "expired")');
-    console.log('   ┌─ When: Checkout session expires');
-    console.log('   ├─ Where: /api/stripe/webhook (checkout.session.expired)');
-    console.log('   ├─ Action: Transaction record updated in DB');
-    console.log('   └─ Data: status="expired"\n');
     
     console.log('🔄 COMPLETE TRANSACTION FLOW WITH DB STORAGE:');
     console.log('==============================================');
     console.log('1. User clicks "Purchase Course" → 💾 PENDING transaction stored in DB');
-    console.log('2. User redirected to Stripe checkout');
+    console.log('2. User redirected to Paystack checkout');
     console.log('3. User pays successfully → 💾 Transaction updated to COMPLETED in DB');
     console.log('4. User gets course access → Enrollment record created');
-    console.log('5. Alternative: Payment fails → 💾 Transaction updated to FAILED in DB');
-    console.log('6. Alternative: Session expires → 💾 Transaction updated to EXPIRED in DB\n');
+    console.log('5. Alternative: Payment fails → 💾 Transaction updated to FAILED in DB\n');
     
     // Example usage scenarios
     console.log('💡 QUERY EXAMPLES:\n');
@@ -180,23 +173,18 @@ async function demonstrateTransactionSystem() {
     console.log('   const failedTransactions = await getTransactionsByStatus("failed");');
     console.log('   // SQL: SELECT * FROM transactions WHERE status="completed"\n');
     
-    console.log('5. Get transaction by Stripe session:');
-    console.log('   const transaction = await getTransactionBySessionId("cs_test_xyz");');
-    console.log('   // SQL: SELECT * FROM transactions WHERE stripe_session_id="cs_test_xyz"\n');
-    
-    console.log('6. Get all transactions for a specific course:');
-    console.log('   const courseTransactions = await getCourseTransactions("course123");');
-    console.log('   // SQL: SELECT * FROM transactions WHERE course="course123"\n');
+    console.log('5. Get transaction by Paystack reference:');
+    console.log('   const transaction = await getTransactionByReference("course_123_user_456_1234567890");');
+    console.log('   // SQL: SELECT * FROM transactions WHERE paystack_reference="course_123_user_456_1234567890"\n');
     
     console.log('📊 ALL POSSIBLE TRANSACTION STATUSES IN DB:');
     console.log('===========================================');
     console.log('- "pending"   → Payment initiated, waiting for completion');
     console.log('- "completed" → Payment successful, user has access');
-    console.log('- "failed"    → Payment failed, no access granted');
-    console.log('- "expired"   → Checkout session expired, no payment made\n');
+    console.log('- "failed"    → Payment failed, no access granted\n');
     
     console.log('✅ GUARANTEE: Every transaction attempt is stored in the database!');
-    console.log('📊 This includes successful payments, failed payments, and expired sessions.');
+    console.log('📊 This includes successful payments and failed payments.');
     console.log('🔍 You can track all user payment behavior and course purchase history.');
 }
 
@@ -204,11 +192,13 @@ async function demonstrateTransactionSystem() {
 demonstrateTransactionSystem().catch(console.error);
 
 // How to update transaction status (done by webhook)
-async function updateTransactionStatus(transactionId, status, paymentIntent = null) {
+async function updateTransactionStatus(transactionId, status, charge = null) {
     try {
         const updateData = { status };
-        if (paymentIntent) {
-            updateData.stripe_payment_intent = paymentIntent;
+        if (charge) {
+            updateData.paystack_charge_id = charge.id;
+            updateData.gateway_response = charge.gateway_response;
+            updateData.paid_at = charge.paid_at;
         }
         
         const record = await pb.collection('transactions').update(transactionId, updateData);
@@ -227,7 +217,7 @@ export {
     updateTransactionStatus,
     getAllTransactions,
     getTransactionsByStatus,
-    getTransactionBySessionId,
+    getTransactionByReference,
     getCourseTransactions,
     exampleTransactionData
 };

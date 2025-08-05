@@ -24,10 +24,22 @@
     }
     
     // Format currency
-    function formatCurrency(amount) {
-        return new Intl.NumberFormat('en-US', {
+    function formatCurrency(amount, currency = 'USD') {
+        const currencyCode = currency.toUpperCase();
+        
+        // Handle different currencies
+        let locale = 'en-US';
+        if (currencyCode === 'NGN') {
+            locale = 'en-NG';
+        } else if (currencyCode === 'GBP') {
+            locale = 'en-GB';
+        } else if (currencyCode === 'EUR') {
+            locale = 'en-EU';
+        }
+        
+        return new Intl.NumberFormat(locale, {
             style: 'currency',
-            currency: 'USD'
+            currency: currencyCode
         }).format(amount);
     }
     
@@ -222,9 +234,13 @@
                                     <div class="text-sm font-medium text-[#F0F0F0] font-mono">
                                         {transaction.id.substring(0, 8)}...
                                     </div>
-                                    {#if transaction.stripe_session_id}
+                                    {#if transaction.paystack_reference}
                                         <div class="text-xs text-[#A0A0A0] font-mono">
-                                            {transaction.stripe_session_id.substring(0, 20)}...
+                                            Paystack: {transaction.paystack_reference.substring(0, 20)}...
+                                        </div>
+                                    {:else}
+                                        <div class="text-xs text-[#A0A0A0]">
+                                            Manual/Legacy
                                         </div>
                                     {/if}
                                 </div>
@@ -258,10 +274,10 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-[#F0F0F0]">
-                                    {formatCurrency(transaction.amount || 0)}
+                                    {formatCurrency(transaction.amount || 0, transaction.currency)}
                                 </div>
                                 <div class="text-sm text-[#A0A0A0]">
-                                    {transaction.currency || 'USD'}
+                                    {(transaction.currency || 'USD').toUpperCase()}
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">

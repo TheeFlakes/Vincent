@@ -10,13 +10,17 @@ let pb;
 
 try {
     pb = new PocketBase(POCKETBASE_URL);
-    // Set timeout for requests
+    // Set optimized timeout for requests
     pb.beforeSend = function (url, options) {
         if (!options.signal) {
             const controller = new AbortController();
-            setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            // Shorter timeout for better UX, with retry logic
+            setTimeout(() => controller.abort(), 8000); // 8 second timeout
             options.signal = controller.signal;
         }
+        // Add cache headers for better performance
+        if (!options.headers) options.headers = {};
+        options.headers['Cache-Control'] = 'no-cache';
         return { url, options };
     };
 } catch (error) {

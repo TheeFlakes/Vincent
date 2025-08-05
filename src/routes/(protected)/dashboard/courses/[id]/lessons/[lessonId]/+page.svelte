@@ -16,6 +16,30 @@
     let isLessonCompleted = $state(false);
     let showCompletionAnimation = $state(false);
     
+    // Update reactive state when data prop changes
+    $effect(() => {
+        if (data) {
+            user = data.user || $currentUser;
+            course = data.course;
+            lesson = data.lesson;
+            lessons = data.lessons || [];
+            totalLessons = data.totalLessons || 0;
+            userProgress = data.userProgress;
+            
+            // Reset lesson-specific states when lesson changes
+            isUpdatingProgress = false;
+            showCompletionAnimation = false;
+            
+            // Check if current lesson is completed when data updates
+            if (userProgress) {
+                const completedLessons = safeParseCompletedLessons(userProgress.completed_lessons);
+                isLessonCompleted = completedLessons.includes(lesson.id);
+            } else {
+                isLessonCompleted = false;
+            }
+        }
+    });
+    
     // Helper function to safely parse completed lessons
     function safeParseCompletedLessons(completedLessons) {
         try {
@@ -38,14 +62,10 @@
     let previousLesson = $state(null);
     
     $effect(() => {
-        currentLessonIndex = lessons.findIndex(l => l.id === lesson.id);
-        nextLesson = currentLessonIndex < lessons.length - 1 ? lessons[currentLessonIndex + 1] : null;
-        previousLesson = currentLessonIndex > 0 ? lessons[currentLessonIndex - 1] : null;
-        
-        // Check if current lesson is completed
-        if (userProgress) {
-            const completedLessons = safeParseCompletedLessons(userProgress.completed_lessons);
-            isLessonCompleted = completedLessons.includes(lesson.id);
+        if (lesson && lessons.length > 0) {
+            currentLessonIndex = lessons.findIndex(l => l.id === lesson.id);
+            nextLesson = currentLessonIndex < lessons.length - 1 ? lessons[currentLessonIndex + 1] : null;
+            previousLesson = currentLessonIndex > 0 ? lessons[currentLessonIndex - 1] : null;
         }
     });
     
@@ -114,7 +134,11 @@
     
     // Navigate to lesson
     function goToLesson(lessonId) {
-        goto(`/dashboard/courses/${course.id}/lessons/${lessonId}`);
+        // Force a full navigation to ensure the page reloads with new data
+        goto(`/dashboard/courses/${course.id}/lessons/${lessonId}`, { 
+            invalidateAll: true,
+            replaceState: false 
+        });
     }
     
     // Navigate to course overview
@@ -156,7 +180,7 @@
     <title>{lesson.title} - {course.title} - Cashfluenced</title>
 </svelte:head>
 
-<main class="bg-[#1A1A1A] min-h-full">
+<main class="bg-[#1A1A1A] min-h-full" style="scroll-behavior: auto;">
     <!-- Progress bar -->
     <div class="bg-[#2B2B2B] border-b border-[#3B3B3B]">
         <div class="px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-3">
@@ -342,7 +366,7 @@
     
     <!-- Completion Animation -->
     {#if showCompletionAnimation}
-        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" style="scroll-behavior: auto;">
             <div class="bg-[#2B2B2B] rounded-xl p-8 border border-[#85D5C8]/30 text-center">
                 <div class="w-16 h-16 bg-[#85D5C8] rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg class="w-8 h-8 text-[#1A1A1A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -350,7 +374,23 @@
                     </svg>
                 </div>
                 <h3 class="text-xl font-bold text-[#F0F0F0] mb-2">Lesson Completed!</h3>
-                <p class="text-[#A0A0A0]">Great job! You're making progress.</p>
+                <p class="text-[#A0A0A0] mb-4">Great job! You're making progress.</p>
+                {#if nextLesson}
+                    <div class="flex gap-3 justify-center">
+                        <button
+                            onclick={() => { showCompletionAnimation = false; }}
+                            class="px-4 py-2 bg-[#2B2B2B] text-[#F0F0F0] rounded-lg hover:bg-[#3B3B3B] transition-colors border border-[#3B3B3B]"
+                        >
+                            Stay Here
+                        </button>
+                        <button
+                            onclick={() => { showCompletionAnimation = false; goToLesson(nextLesson.id); }}
+                            class="px-4 py-2 bg-[#C392EC] text-white rounded-lg hover:bg-[#C392EC]/80 transition-colors"
+                        >
+                            Next Lesson
+                        </button>
+                    </div>
+                {/if}
             </div>
         </div>
     {/if}
