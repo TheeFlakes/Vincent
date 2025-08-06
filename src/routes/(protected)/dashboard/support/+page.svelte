@@ -184,31 +184,6 @@
             <p class="text-sm sm:text-base md:text-lg text-[#A0A0A0]">
                 Get help with your account or ask questions about our platform
             </p>
-            
-            <!-- Real-time Status Indicator -->
-            <div class="flex items-center justify-center gap-2 mt-4">
-                <div class="flex items-center gap-2 px-3 py-1 rounded-full 
-                    {connectionStatus === 'connected' ? 'bg-green-500/10 border border-green-500/20' : 
-                     connectionStatus === 'connecting' ? 'bg-yellow-500/10 border border-yellow-500/20' :
-                     connectionStatus === 'error' ? 'bg-red-500/10 border border-red-500/20' :
-                     'bg-gray-500/10 border border-gray-500/20'}">
-                    <div class="w-2 h-2 rounded-full 
-                        {connectionStatus === 'connected' ? 'bg-green-400 animate-pulse' : 
-                         connectionStatus === 'connecting' ? 'bg-yellow-400 animate-spin' :
-                         connectionStatus === 'error' ? 'bg-red-400' :
-                         'bg-gray-400'}"></div>
-                    <span class="text-xs font-medium 
-                        {connectionStatus === 'connected' ? 'text-green-400' : 
-                         connectionStatus === 'connecting' ? 'text-yellow-400' :
-                         connectionStatus === 'error' ? 'text-red-400' :
-                         'text-gray-400'}">
-                        {connectionStatus === 'connected' ? 'Real-time updates active' : 
-                         connectionStatus === 'connecting' ? 'Connecting to real-time updates...' :
-                         connectionStatus === 'error' ? 'Connection failed' :
-                         'Disconnected'}
-                    </span>
-                </div>
-            </div>
         </div>
 
         <!-- Success/Error Messages -->

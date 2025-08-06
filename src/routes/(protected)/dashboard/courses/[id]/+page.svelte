@@ -92,8 +92,7 @@
             return 'Free';
         }
         const usdPrice = course.price;
-        const kesPrice = Math.round(usdPrice * 150); // Convert to KES
-        return `$${usdPrice} / KSh ${kesPrice.toLocaleString()}`;
+        return `$${usdPrice}`;
     }
     
     // Get price badge class

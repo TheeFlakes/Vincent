@@ -306,7 +306,7 @@ export async function validateReferralCode(referralCode) {
 
         const result = await pb.collection('users').getList(1, 1, {
             filter: `referralCode = "${referralCode.trim()}"`,
-            fields: 'id,name,email,referralCode',
+            fields: 'id,username,email,referralCode',
             requestKey: null
         });
 
@@ -322,7 +322,7 @@ export async function validateReferralCode(referralCode) {
             valid: true, 
             referringUser: {
                 id: referringUser.id,
-                name: referringUser.name,
+                name: referringUser.username,
                 email: referringUser.email.substring(0, 3) + '***' // Partially hidden email
             }
         };
@@ -354,18 +354,79 @@ export async function getReferralStats(userId) {
             fields: 'referralCode'
         });
 
-        // Get commission earnings for this user
+        // Get all commission transactions earned by this user
+        let commissionTransactions = [];
         let totalEarnings = 0;
+        
         try {
-            const commissionTransactions = await pb.collection('transactions').getFullList({
+            commissionTransactions = await pb.collection('transactions').getFullList({
                 filter: `user = "${userId}" && transaction_type = "commission"`,
-                fields: 'amount',
+                fields: 'id,amount,currency,commission_from_user,course,created,paid_at,original_transaction_ref',
+                expand: 'commission_from_user,course',
+                sort: '-created',
                 requestKey: null
             });
             totalEarnings = commissionTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
         } catch (err) {
-            console.error('Error fetching commission earnings:', err);
+            console.error('Error fetching commission transactions:', err);
         }
+
+        // Create detailed downline information with commissions
+        const detailedDownlines = [];
+        
+        for (const referredUser of referredUsers) {
+            // Get all purchases made by this downline
+            const downlinePurchases = await pb.collection('transactions').getFullList({
+                filter: `user = "${referredUser.id}" && status = "completed" && transaction_type != "commission"`,
+                fields: 'id,amount,currency,course,created,paid_at,paystack_reference',
+                expand: 'course',
+                sort: '-created',
+                requestKey: null
+            }).catch(err => {
+                console.error(`Error fetching purchases for user ${referredUser.id}:`, err);
+                return [];
+            });
+
+            // Get commissions earned from this specific downline
+            const commissionsFromThisUser = commissionTransactions.filter(
+                tx => tx.commission_from_user === referredUser.id
+            );
+
+            const totalCommissionFromUser = commissionsFromThisUser.reduce(
+                (sum, tx) => sum + (tx.amount || 0), 0
+            );
+
+            detailedDownlines.push({
+                id: referredUser.id,
+                name: referredUser.name,
+                email: referredUser.email.substring(0, 3) + '***', // Partially hidden
+                joinDate: new Date(referredUser.created).toLocaleDateString(),
+                totalPurchases: downlinePurchases.length,
+                totalSpent: downlinePurchases.reduce((sum, tx) => sum + (tx.amount || 0), 0),
+                totalCommissionEarned: totalCommissionFromUser,
+                purchases: downlinePurchases.map(purchase => ({
+                    id: purchase.id,
+                    amount: purchase.amount,
+                    currency: purchase.currency || 'USD',
+                    courseName: purchase.expand?.course?.title || 'Unknown Course',
+                    purchaseDate: new Date(purchase.created).toLocaleDateString(),
+                    commissionEarned: commissionsFromThisUser.find(
+                        comm => comm.original_transaction_ref === purchase.paystack_reference
+                    )?.amount || 0
+                })),
+                commissions: commissionsFromThisUser.map(comm => ({
+                    id: comm.id,
+                    amount: comm.amount,
+                    currency: comm.currency || 'USD',
+                    courseName: comm.expand?.course?.title || 'Unknown Course',
+                    earnedDate: new Date(comm.created).toLocaleDateString(),
+                    originalRef: comm.original_transaction_ref
+                }))
+            });
+        }
+
+        // Sort downlines by total commission earned (highest first)
+        detailedDownlines.sort((a, b) => b.totalCommissionEarned - a.totalCommissionEarned);
 
         return {
             referralCode: user.referralCode,
@@ -376,6 +437,16 @@ export async function getReferralStats(userId) {
                 name: user.name,
                 email: user.email.substring(0, 3) + '***', // Partially hidden
                 joinDate: new Date(user.created).toLocaleDateString()
+            })),
+            detailedDownlines: detailedDownlines,
+            recentCommissions: commissionTransactions.slice(0, 10).map(tx => ({
+                id: tx.id,
+                amount: tx.amount,
+                currency: tx.currency || 'USD',
+                fromUser: tx.expand?.commission_from_user?.name || 'Unknown',
+                courseName: tx.expand?.course?.title || 'Unknown Course',
+                earnedDate: new Date(tx.created).toLocaleDateString(),
+                earnedTime: new Date(tx.created).toLocaleTimeString()
             }))
         };
     } catch (error) {
@@ -384,7 +455,9 @@ export async function getReferralStats(userId) {
             referralCode: '',
             totalReferrals: 0,
             totalEarnings: 0,
-            referredUsers: []
+            referredUsers: [],
+            detailedDownlines: [],
+            recentCommissions: []
         };
     }
 }
