@@ -2,8 +2,10 @@ import PocketBase from 'pocketbase';
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
-// PocketBase URL with fallback
-const POCKETBASE_URL = import.meta.env.VITE_POCKETBASE_URL || 'https://vin254.pockethost.io';
+// PocketBase URL - use our proxy in production, direct in development
+const POCKETBASE_URL = browser && window.location.hostname === 'cashfluenced.org' 
+    ? '/api/pb'  // Use local proxy in production
+    : (import.meta.env.VITE_POCKETBASE_URL || 'https://vin254.pockethost.io'); // Direct in development
 
 // Initialize PocketBase client with error handling
 /** @type {PocketBase} */
@@ -24,6 +26,7 @@ try {
         if (!options.headers) options.headers = {};
         options.headers['Cache-Control'] = 'no-cache';
         options.headers['X-Requested-With'] = 'XMLHttpRequest';
+        options.headers['Origin'] = 'https://cashfluenced.org';
         
         // Add credentials mode for auth cookies
         options.mode = 'cors';
@@ -68,7 +71,13 @@ if (pb.authStore && typeof pb.authStore.onChange === 'function') {
 // Helper function to create a server-side PocketBase instance
 export function createServerPB() {
     try {
-        const serverPB = new PocketBase(POCKETBASE_URL);
+        // For server-side, we can make direct requests to PocketBase 
+        // or use our internal network if available
+        const serverPBUrl = process.env.INTERNAL_POCKETBASE_URL || 
+                           import.meta.env.VITE_POCKETBASE_URL || 
+                           'https://vin254.pockethost.io';
+                           
+        const serverPB = new PocketBase(serverPBUrl);
         // Set timeout for server requests with CORS handling
         serverPB.beforeSend = function (url, options) {
             if (!options.signal) {
@@ -81,6 +90,7 @@ export function createServerPB() {
             if (!options.headers) options.headers = {};
             options.headers['Cache-Control'] = 'no-cache';
             options.headers['X-Requested-With'] = 'XMLHttpRequest';
+            options.headers['Origin'] = 'https://cashfluenced.org';
             
             // Add credentials mode for auth cookies
             options.mode = 'cors';
