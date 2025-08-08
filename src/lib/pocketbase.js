@@ -3,9 +3,12 @@ import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
 // PocketBase URL - use our proxy in production, direct in development
-const POCKETBASE_URL = browser && window.location.hostname === 'cashfluenced.org' 
+const POCKETBASE_URL = browser && (window.location.hostname === 'cashfluenced.org' || window.location.hostname === 'www.cashfluenced.org')
     ? '/api/pb'  // Use local proxy in production
     : (import.meta.env.VITE_POCKETBASE_URL || 'https://vin254.pockethost.io'); // Direct in development
+
+// Store the original URL for debugging purposes
+const ORIGINAL_POCKETBASE_URL = import.meta.env.VITE_POCKETBASE_URL || 'https://vin254.pockethost.io';
 
 // Initialize PocketBase client with error handling
 /** @type {PocketBase} */
@@ -73,10 +76,12 @@ export function createServerPB() {
     try {
         // For server-side, we can make direct requests to PocketBase 
         // or use our internal network if available
+        // ALWAYS use direct URL on server side to avoid proxy loops
         const serverPBUrl = process.env.INTERNAL_POCKETBASE_URL || 
                            import.meta.env.VITE_POCKETBASE_URL || 
                            'https://vin254.pockethost.io';
-                           
+        
+        console.log('Creating server-side PocketBase with URL:', serverPBUrl);           
         const serverPB = new PocketBase(serverPBUrl);
         // Set timeout for server requests with CORS handling
         serverPB.beforeSend = function (url, options) {
