@@ -7,7 +7,7 @@ try {
 	tailwindcssPlugin = tailwindcss.default();
 	console.log('✓ @tailwindcss/vite loaded successfully');
 } catch (error) {
-	console.warn('⚠ Failed to load @tailwindcss/vite, falling back to PostCSS:', error instanceof Error ? error.message : String(error));
+	console.warn('⚠ Failed to load @tailwindcss/vite, falling back to PostCSS:', error.message);
 	tailwindcssPlugin = null;
 }
 
@@ -32,5 +32,13 @@ export default defineConfig({
 	},
 	ssr: {
 		noExternal: ['lightningcss']
+	},
+	preview: {
+		allowedHosts: [
+			'cashfluenced.org',
+			'www.cashfluenced.org',
+			'localhost',
+			'127.0.0.1'
+		]
 	}
 });
