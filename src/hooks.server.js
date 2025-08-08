@@ -121,7 +121,14 @@ export async function handle({ event, resolve }) {
         }
     }
 
+    // Process the response and add CORS headers
     const response = await resolve(event);
-
+    
+    // Add CORS headers to the response
+    response.headers.append('Access-Control-Allow-Origin', '*');
+    response.headers.append('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.headers.append('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    response.headers.append('Access-Control-Allow-Credentials', 'true');
+    
     return response;
 }

@@ -45,12 +45,18 @@ export const actions = {
             
             console.log('Setting auth cookie...');
             cookies.set('pb_auth', cookieValue, {
-                secure: false, // Set to true in production with HTTPS
+                secure: process.env.NODE_ENV === 'production', // Secure in production
                 httpOnly: false, // PocketBase needs access from client-side
                 sameSite: 'lax',
                 maxAge: 60 * 60 * 24 * 7, // 1 week
-                path: '/'
+                path: '/',
+                domain: '' // Leave empty to use the current domain
             });
+            
+            // Also store in localStorage as a fallback
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('pocketbase_auth', pb.authStore.exportToCookie());
+            }
 
             console.log('Redirecting to dashboard...');
             // Redirect to dashboard on successful login
