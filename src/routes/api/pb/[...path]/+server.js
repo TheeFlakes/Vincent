@@ -9,6 +9,12 @@ import { error, json } from '@sveltejs/kit';
 async function handleRequest(request, path) {
     // The actual PocketBase URL
     const POCKETBASE_URL = import.meta.env.VITE_POCKETBASE_URL || 'https://vin254.pockethost.io';
+    
+    // Special handling for login requests
+    if (path === 'login') {
+        path = 'api/collections/users/auth-with-password';
+    }
+    
     const url = `${POCKETBASE_URL}/${path}`;
     
     // Get query parameters and add them to the URL
@@ -75,7 +81,12 @@ async function handleRequest(request, path) {
         const responseHeaders = new Headers(pbResponse.headers);
         
         // Set CORS headers for our frontend
-        responseHeaders.set('Access-Control-Allow-Origin', 'https://cashfluenced.org');
+        const origin = request.headers.get('Origin');
+        if (origin) {
+            responseHeaders.set('Access-Control-Allow-Origin', origin);
+        } else {
+            responseHeaders.set('Access-Control-Allow-Origin', '*');
+        }
         responseHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
         responseHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
         responseHeaders.set('Access-Control-Allow-Credentials', 'true');
@@ -96,16 +107,24 @@ async function handleRequest(request, path) {
 /**
  * Handle OPTIONS requests for CORS preflight
  */
-export async function OPTIONS({ params }) {
+export async function OPTIONS({ request, params }) {
+    const origin = request.headers.get('Origin');
+    const headers = new Headers({
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Max-Age': '86400' // 24 hours
+    });
+    
+    if (origin) {
+        headers.set('Access-Control-Allow-Origin', origin);
+    } else {
+        headers.set('Access-Control-Allow-Origin', '*');
+    }
+    
     return new Response(null, {
         status: 204,
-        headers: {
-            'Access-Control-Allow-Origin': 'https://cashfluenced.org',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-            'Access-Control-Allow-Credentials': 'true',
-            'Access-Control-Max-Age': '86400' // 24 hours
-        }
+        headers
     });
 }
 
@@ -113,33 +132,33 @@ export async function OPTIONS({ params }) {
  * Handle GET requests
  */
 export async function GET({ request, params }) {
-    return handleRequest(request, `api/${params.path}`);
+    return handleRequest(request, params.path);
 }
 
 /**
  * Handle POST requests
  */
 export async function POST({ request, params }) {
-    return handleRequest(request, `api/${params.path}`);
+    return handleRequest(request, params.path);
 }
 
 /**
  * Handle PUT requests
  */
 export async function PUT({ request, params }) {
-    return handleRequest(request, `api/${params.path}`);
+    return handleRequest(request, params.path);
 }
 
 /**
  * Handle PATCH requests
  */
 export async function PATCH({ request, params }) {
-    return handleRequest(request, `api/${params.path}`);
+    return handleRequest(request, params.path);
 }
 
 /**
  * Handle DELETE requests
  */
 export async function DELETE({ request, params }) {
-    return handleRequest(request, `api/${params.path}`);
+    return handleRequest(request, params.path);
 }
